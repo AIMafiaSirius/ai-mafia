@@ -26,12 +26,11 @@ class InitSessionProcessing(BaseProcessing):
 
     async def call(self, ctx: Context):
         tg_info: tg.Update = ctx.last_request.original_message
-        user_id = tg_info.effective_user.id
-        print(f"{user_id=}")
+        tg_id = tg_info.effective_user.id
         user_nickname = tg_info.effective_user.name
-        user_info = find_user(user_id)
+        user_info = find_user(tg_id)
         if user_info is None:
-            user_info = add_user(user_id, user_nickname)
+            user_info = add_user(tg_id, user_nickname)
         ctx.misc["user_info"] = user_info
 
 
@@ -42,7 +41,6 @@ class GreetingResponse(BaseResponse):
 
     async def call(self, ctx: Context):
         user_info: UserModel = ctx.misc["user_info"]
-        print(user_info)
         return f"Hello, {user_info.tg_nickname}! You pinged me {user_info.ping_counter} times in the past."
 
 class PongResponse(BaseResponse):

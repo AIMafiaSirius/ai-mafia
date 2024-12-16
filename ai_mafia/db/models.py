@@ -10,8 +10,11 @@ class UserModel(BaseModel):
     db_id: ObjectId | None = Field(
         default=None,
         alias="_id",
-        description="Unique identifier in mongo db. User's telegram id"
+        description="Unique identifier in mongo db"
     )
+
+    tg_id: int
+    """User's telegram id"""
 
     tg_nickname: str
     """User's telegram nickname"""
