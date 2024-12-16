@@ -1,73 +1,61 @@
-import chatsky.conditions as cnd
-import chatsky.destinations as dst
-from chatsky import RESPONSE, TRANSITIONS, Pipeline, PRE_RESPONSE
-from chatsky import Transition as Tr
 import random
+from enum import Enum
+
+import chatsky.conditions as cnd
+from chatsky import PRE_TRANSITION, RESPONSE, TRANSITIONS, BaseProcessing, BaseResponse, Context, Pipeline
+from chatsky import Transition as Tr
 
 
-players = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-
-players_id = []
-# массив used нужны id телеграммов игроков
-
-mafia_id = []
-# id телегоаммов мафии
-
-mafia = []
-# номера мафии
-
-cards = {0: "Мирный",
-         1: "Комиссар",
-         2: "Мафия",
-         3: "Дон мафии"}
-# карты в int
-
-players_role = [2, 2, 3, 1, 0, 0, 0, 0, 0, 0]
-# роли игкоков
+class Role(Enum):
+    peaceful = "мирный"
+    commissar = "комиссар"
+    mafia = "мафия"
+    don = "дон"
 
 
-def mixed_role():
-    for i in range(len(players_role)):
-        r = random.randint(0, i)
-        players_role[i], players_role[r] = players_role[r], players_role[i]
-    return players_role
+class AssignRoles(BaseProcessing):
+    async def call(self, ctx: Context):
+        # retrieve by room's id from database
+        ctx.misc["players_id"] = [
+            "id_1",
+            "id_2",
+            "id_3",
+            "id_4",
+            "id_5",
+            "id_6",
+            "id_7",
+            "id_8",
+            "id_9",
+            "id_10",
+        ]
+
+        # retrieve roles from database if exist
+        # else initialize
+        ctx.misc["players_roles"] = {
+            player_id: random.choice(list(Role)) for player_id in ctx.misc["players_id"]
+        }
 
 
-def get_role_for_all():
-    role = ""
-    for i in range(10):
-        if i != 9:
-            role = role + "Ваша роль: " + cards[players_role[i]] + "\n"
-        else:
-            role = role + "Ваша роль: " + cards[players_role[i]]
+class RoleResponse(BaseResponse):
+    async def call(self, ctx: Context):
+        "Начало игры, раздача карт!"
+        current_user_role: Role = ctx.misc["players_roles"]["id_8"] # should be `ctx.id`
+        return current_user_role.value
 
-    return role
-
-
-
-number_of_living_players = len(players)
-
-players_role = mixed_role()
 
 mafia_get_role = {
     "greeting_flow": {
         "start_node": {
-            TRANSITIONS: [Tr(dst="greeting_node", cnd=cnd.ExactMatch("/start"))]
-
+            TRANSITIONS: [Tr(dst="greeting_node", cnd=cnd.ExactMatch("/get_role"))],
+            PRE_TRANSITION: {"assign_roles": AssignRoles()},
         },
         "greeting_node": {
-            RESPONSE: "Начало игры, раздача карт!",
-            TRANSITIONS: [Tr(dst=("mafia_get_role_flow", "get_role1"))],
+            RESPONSE: RoleResponse(),
         },
         "fallback_node": {
             RESPONSE: "That was against the rules",
             TRANSITIONS: [Tr(dst="greeting_node")],
             # не правильный текст
-        },
-    },
-    "mafia_get_role_flow": {
-        "get_role1": {
-            RESPONSE: get_role_for_all(),
         },
     },
 }
