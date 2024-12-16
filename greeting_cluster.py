@@ -1,13 +1,49 @@
-import chatsky.conditions as cnd
-import chatsky.destinations as dst
-from chatsky import RESPONSE, TRANSITIONS, Pipeline
-from chatsky import Transition as Tr
+from chatsky import (
+    TRANSITIONS,
+    RESPONSE,
+    Context,
+    Message,
+    Pipeline,
+    Transition as Tr,
+    conditions as cnd,
+    responses as rsp,
+    destinations as dst,
+    BaseResponse,
+    MessageInitTypes,
+    AnyResponse,
+    AbsoluteNodeLabel,
+)
+from typing import Union
+import re
 
-from uuid import uuid1
+from uuid import uuid4
 
-map_id = {}
+class Room:
+
+    def __init__(self, name):
+        self.name = name
+        self.players = []
+    
+
+map_room = {}
+
+class new_room(BaseResponse):
+    async def call(self, ctx: Context) -> MessageInitTypes:
+        curId = uuid4()
+        request = ctx.last_request.text
+        map_room[curId] = Room(request)
+        return str(curId) + ' ' + str(request)
+
 
 mafia_script = {
+    "global_flow": {
+        "start_node": {},
+        "fallback_node": {
+            RESPONSE: "К сожалению я не могу обработать такую команду, введите другую",
+            TRANSITIONS: [Tr(dst=dst.Backward())]
+            # this transition is unconditional
+        },
+    },
     "greeting_flow": {
         "start_node": {
             TRANSITIONS: [Tr(dst="greeting_node", cnd=cnd.ExactMatch("/start"))]
@@ -16,40 +52,30 @@ mafia_script = {
         "greeting_node": {
             RESPONSE: "Привет! Нужна ли вам инструкция по игре?",
             TRANSITIONS: [Tr(dst=("game_start_node"), cnd=cnd.ExactMatch("Да"))],
-            TRANSITIONS: [Tr(dst=("choose_room"), cnd=cnd.ExactMatch("Нет"))],
+            TRANSITIONS: [Tr(dst=("room_flow", "choose"), cnd=cnd.ExactMatch("Нет"))],
         },
         "instruction": {
             # RESPONSE: "...",
-            TRANSITIONS: [Tr(dst=("choose_room"))],
+            TRANSITIONS: [Tr(dst=("room_flow", "choose"))],
         },
-        "choose_room": {
+    },
+    "room_flow": {
+        "choose": {
             RESPONSE: "Создай комнату или присоединись к существующей",
             TRANSITIONS: [Tr(dst=("enter_id"), cnd=cnd.ExactMatch("Присоединиться"))],
-            TRANSITIONS: [Tr(dst=("make_room"), cnd=cnd.ExactMatch("Создать"))],
+            TRANSITIONS: [Tr(dst=("make"), cnd=cnd.ExactMatch("Создать"))],
         },
-        "make_room": {
+        "make": {
             RESPONSE: "Введите название для комнаты",
-            # TRANSITIONS: [Tr(dst=())],
+            TRANSITIONS: [Tr(dst=("new"))],
+        },
+        "new": {
+            RESPONSE: new_room(),
         },
         "enter_id": {
             RESPONSE: "Введите id комнаты, или присоединитесь к случайной",
             # TRANSITIONS: [Tr(dst(""), )],
             # TRANSITIONS: [Tr(dst(""), )],
-        },
-        
-        "fallback_node": {
-            RESPONSE: "К сожалению я не могу обработать такую команду, введите другую",
-            # this transition is unconditional
-        },
-    },
-    "ping_pong_flow": {
-        "game_start_node": {
-            RESPONSE: "Let's play ping-pong!",
-            TRANSITIONS: [Tr(dst="response_node", cnd=cnd.ExactMatch("Ping!"))],
-        },
-        "response_node": {
-            RESPONSE: "Pong!",
-            TRANSITIONS: [Tr(dst=dst.Current(), cnd=cnd.ExactMatch("Ping!"))],
         },
     },
 }
@@ -57,7 +83,7 @@ mafia_script = {
 pipeline = Pipeline(
     mafia_script,
     start_label=("greeting_flow", "start_node"),
-    fallback_label=("greeting_flow", "fallback_node"),
+    fallback_label=("global_flow", "fallback_node"),
 )
 
 if __name__ == "__main__":
