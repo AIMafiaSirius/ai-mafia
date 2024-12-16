@@ -38,6 +38,7 @@ ignore = [
     "D",       # docstrings
     "ANN",     # type annotations
     "T201",    # print statements
+    "RUF001",  # cyrillic letters
 ]
 
 [tool.ruff.lint.per-file-ignores]

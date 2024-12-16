@@ -1,45 +1,50 @@
+import random
+from uuid import uuid4
+
 from chatsky import (
     PRE_RESPONSE,
     RESPONSE,
     TRANSITIONS,
-    Context,
-    Pipeline,
-    Transition as Tr,
-    conditions as cnd,
-    responses as rsp,
-    destinations as dst,
-    BaseCondition,
     BaseResponse,
+    Context,
     MessageInitTypes,
+    Pipeline,
+)
+from chatsky import (
+    Transition as Tr,
+)
+from chatsky import (
+    conditions as cnd,
+)
+from chatsky import (
+    destinations as dst,
 )
 from chatsky.processing import ModifyResponse
-import random
 
-from uuid import uuid4
 
 class Room:
-
     def __init__(self, name):
         self.name = name
         self.players = []
-    
+
 
 map_room = {}
 
+
 class NewRoom(BaseResponse):
     async def call(self, ctx: Context) -> MessageInitTypes:
-        curId = uuid4()
+        cur_id = uuid4()
         name = ctx.last_request.text
-        map_room[curId] = Room(name)
-        return "Id: " + str(curId) + '\n' + "Комната: " + str(name) + '\n' + "Присоединиться?"
+        map_room[cur_id] = Room(name)
+        return "Id: " + str(cur_id) + "\n" + "Комната: " + str(name) + "\n" + "Присоединиться?"
 
 
 class RandomID(ModifyResponse):
     async def modified_response(self, _: BaseResponse, __: Context) -> MessageInitTypes:
         if len(map_room) == 0:
             return "К сожалению сейчас нет открытых игр, попробуйте позже или создайте свою"
-        curId, name = random.choice(map_room)
-        return "Id: " + str(curId) + '\n' + "Комната: " + str(name) + '\n' + "Присоединиться?"
+        cur_id, name = random.choice(map_room)
+        return "Id: " + str(cur_id) + "\n" + "Комната: " + str(name) + "\n" + "Присоединиться?"
 
 
 greeting_script = {
