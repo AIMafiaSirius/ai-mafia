@@ -28,9 +28,8 @@ def define_schema(db: Database):
     users_validator = {
         "$jsonSchema": {
             "bsonType": "object",
-            "required": ["user_id", "name"],
+            "required": ["name"],
             "properties": {
-                "user_id": {"bsonType": "string", "description": "must be a string and is required"},
                 "name": {"bsonType": "string", "description": "must be a string and is required"},
             },
         }
@@ -39,9 +38,8 @@ def define_schema(db: Database):
     game_rooms_validator = {
         "$jsonSchema": {
             "bsonType": "object",
-            "required": ["game_id", "game_name", "users"],
+            "required": ["game_name", "users"],
             "properties": {
-                "game_id": {"bsonType": "string", "description": "must be a string and is required"},
                 "game_name": {"bsonType": "string", "description": "must be a string and is required"},
                 "users": {
                     "bsonType": "array",
