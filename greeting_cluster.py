@@ -1,8 +1,8 @@
 from chatsky import (
-    TRANSITIONS,
+    PRE_RESPONSE,
     RESPONSE,
+    TRANSITIONS,
     Context,
-    Message,
     Pipeline,
     Transition as Tr,
     conditions as cnd,
@@ -13,8 +13,8 @@ from chatsky import (
     AnyResponse,
     AbsoluteNodeLabel,
 )
-from typing import Union
-import re
+from chatsky.processing import ModifyResponse
+import random
 
 from uuid import uuid4
 
@@ -27,23 +27,21 @@ class Room:
 
 map_room = {}
 
-class new_room(BaseResponse):
+class NewRoom(BaseResponse):
     async def call(self, ctx: Context) -> MessageInitTypes:
         curId = uuid4()
-        request = ctx.last_request.text
-        map_room[curId] = Room(request)
-        return str(curId) + ' ' + str(request)
+        name = ctx.last_request.text
+        map_room[curId] = Room(name)
+        return "Id: " + str(curId) + '\n' + "Комната: " + str(name) + '\n' + "Присоединиться?"
 
 
-mafia_script = {
-    "global_flow": {
-        "start_node": {},
-        "fallback_node": {
-            RESPONSE: "К сожалению я не могу обработать такую команду, введите другую",
-            TRANSITIONS: [Tr(dst=dst.Backward())]
-            # this transition is unconditional
-        },
-    },
+class RandomID(ModifyResponse):
+    async def modified_response(self, _: BaseResponse, __: Context) -> MessageInitTypes:
+        curId, name = random.choice(map_room)
+        return "Id: " + str(curId) + '\n' + "Комната: " + str(name) + '\n' + "Присоединиться?"
+
+
+greeting_script = {
     "greeting_flow": {
         "start_node": {
             TRANSITIONS: [Tr(dst="greeting_node", cnd=cnd.ExactMatch("/start"))]
@@ -58,6 +56,11 @@ mafia_script = {
             # RESPONSE: "...",
             TRANSITIONS: [Tr(dst=("room_flow", "choose"))],
         },
+        "fallback_node": {
+            RESPONSE: "К сожалению я не могу обработать такую команду, введите другую",
+            TRANSITIONS: [Tr(dst=dst.Backward())]
+            # this transition is unconditional
+        },
     },
     "room_flow": {
         "choose": {
@@ -70,20 +73,26 @@ mafia_script = {
             TRANSITIONS: [Tr(dst=("new"))],
         },
         "new": {
-            RESPONSE: new_room(),
+            RESPONSE: NewRoom(),
+            TRANSITIONS: [Tr(dst=("choose"), cnd=cnd.ExactMatch("Назад"))],
+            # TRANSITIONS: [Tr(dst=(...), cnd=cnd.ExactMatch("Да"))],
         },
         "enter_id": {
             RESPONSE: "Введите id комнаты, или присоединитесь к случайной",
+            TRANSITIONS: [Tr(dst=("random_id"), cnd=cnd.ExactMatch("К случайной"))],
             # TRANSITIONS: [Tr(dst(""), )],
-            # TRANSITIONS: [Tr(dst(""), )],
+        },
+        "random_id": {
+            PRE_RESPONSE: {"random_id_service": RandomID()},
+            RESPONSE: "",
         },
     },
 }
 
 pipeline = Pipeline(
-    mafia_script,
+    greeting_script,
     start_label=("greeting_flow", "start_node"),
-    fallback_label=("global_flow", "fallback_node"),
+    fallback_label=("greeting_flow", "fallback_node"),
 )
 
 if __name__ == "__main__":
