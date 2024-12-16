@@ -1,7 +1,13 @@
+import os
+
 import chatsky.conditions as cnd
 import chatsky.destinations as dst
 from chatsky import RESPONSE, TRANSITIONS, Pipeline
 from chatsky import Transition as Tr
+from chatsky.messengers.telegram import LongpollingInterface
+from dotenv import load_dotenv
+
+load_dotenv()
 
 ping_pong_script = {
     "greeting_flow": {
@@ -31,10 +37,13 @@ ping_pong_script = {
     },
 }
 
+interface = LongpollingInterface(token=os.environ["TG_TOKEN"])
+
 pipeline = Pipeline(
     ping_pong_script,
     start_label=("greeting_flow", "start_node"),
     fallback_label=("greeting_flow", "fallback_node"),
+    messenger_interface=interface,
 )
 
 if __name__ == "__main__":
