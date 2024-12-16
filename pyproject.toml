@@ -10,7 +10,8 @@ python = "^3.10"
 chatsky = {extras = ["telegram"], version = "^0.9.0"}
 python-dotenv = "^1.0.1"
 pymongo = "^4.10.1"
-hydra-core = "^1.3.2"
+pydantic = "^2.10.3"
+pyyaml = "^6.0.2"
 
 [tool.poetry.group.dev]
 optional = true

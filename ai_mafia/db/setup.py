@@ -1,6 +1,7 @@
-from dataclasses import dataclass
+import importlib.resources as ires
 
-import hydra
+import yaml
+from pydantic import BaseModel
 from pymongo import MongoClient
 from pymongo.database import Database
 
@@ -63,15 +64,19 @@ def define_schema(db: Database):
     print("Schema defined successfully.")
 
 
-@dataclass
-class DBConfig:
+class DBConfig(BaseModel):
     clear_previous: bool
     address: str
     db_name: str
 
 
-@hydra.main(config_name="config", config_path=".", version_base=None)
-def main(cfg: DBConfig):
+def load_config() -> DBConfig:
+    path = ires.files("ai_mafia.db").joinpath("config.yaml")
+    with path.open() as file:
+        return DBConfig(**yaml.safe_load(file))
+
+def main():
+    cfg = load_config()
     client = MongoClient(cfg.address)
 
     if cfg.clear_previous:
