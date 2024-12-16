@@ -1,12 +1,19 @@
 [tool.poetry]
 name = "ai-mafia"
-version = "0.1.0"
+version = "0.0.1-alpha"
 description = ""
 authors = ["voorhs <ilya_alekseev_2016@list.ru>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.12"
+
+[tool.poetry.group.dev]
+optional = true
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.8.3"
+pytest = "^8.3.4"
 
 [tool.ruff]
 line-length = 120
@@ -32,6 +39,14 @@ ignore = [
 "__init__.py" = ["F401", "D104"]
 "ai_mafia/__init__.py" = ["I001"]
 "tests/*.py" = ["S", "PLR2004", "ERA", "D", "ANN", "SLF"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-ra" # `--cov` option breaks pycharm's test debugger
+testpaths = [
+    "tests",
+]
+pythonpath = "ai_mafia"
 
 [build-system]
 requires = ["poetry-core"]
