@@ -1,0 +1,3 @@
+clear_previous: false
+address: "mongodb://localhost:27017/"
+db_name: "mafia_db"
