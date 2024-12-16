@@ -71,6 +71,7 @@ class DBConfig(BaseModel):
 
 
 def load_config() -> DBConfig:
+    """Load configuration settings for mongo db"""
     path = ires.files("ai_mafia.db").joinpath("config.yaml")
     with path.open() as file:
         return DBConfig(**yaml.safe_load(file))
@@ -82,5 +83,4 @@ def main():
     if cfg.clear_previous:
         client.drop_database(cfg.db_name)
 
-    db = create_database(client, db_name=cfg.db_name)
-    define_schema(db)
+    create_database(client, db_name=cfg.db_name)
