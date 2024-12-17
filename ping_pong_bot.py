@@ -1,6 +1,6 @@
 import chatsky.conditions as cnd
 import chatsky.destinations as dst
-from chatsky import RESPONSE, TRANSITIONS, Pipeline
+from chatsky import GLOBAL, RESPONSE, TRANSITIONS, Pipeline
 from chatsky import Transition as Tr
 
 ping_pong_script = {
