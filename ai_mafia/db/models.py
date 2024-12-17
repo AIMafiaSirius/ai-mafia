@@ -7,11 +7,7 @@ class UserModel(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    db_id: ObjectId | None = Field(
-        default=None,
-        alias="_id",
-        description="Unique identifier in mongo db"
-    )
+    db_id: ObjectId | None = Field(default=None, alias="_id", description="Unique identifier in mongo db")
 
     tg_id: int
     """User's telegram id"""

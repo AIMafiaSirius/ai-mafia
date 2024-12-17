@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
 load_dotenv()
 
+
 class InitSessionProcessing(BaseProcessing):
     """
     Add user tg id to database.
@@ -43,6 +44,7 @@ class GreetingResponse(BaseResponse):
         user_info: UserModel = ctx.misc["user_info"]
         return f"Hello, {user_info.tg_nickname}! You pinged me {user_info.ping_counter} times in the past."
 
+
 class PongResponse(BaseResponse):
     """
     Make response as "Pong, @username!".
@@ -62,7 +64,7 @@ ping_pong_script = {
     "greeting_flow": {
         "start_node": {
             TRANSITIONS: [Tr(dst="greeting_node", cnd=cnd.ExactMatch("/start"))],
-            PRE_TRANSITION: {"init": InitSessionProcessing()}
+            PRE_TRANSITION: {"init": InitSessionProcessing()},
         },
         "greeting_node": {
             RESPONSE: GreetingResponse(),

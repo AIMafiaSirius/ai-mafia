@@ -27,6 +27,7 @@ def find_user(tg_id: int) -> UserModel | None:
         return None
     return UserModel(**result)
 
+
 def add_user(tg_id: int, tg_nickname: str) -> UserModel:
     """Add info about user to database and return full info about him."""
     user = UserModel(tg_id=tg_id, tg_nickname=tg_nickname)
@@ -34,23 +35,24 @@ def add_user(tg_id: int, tg_nickname: str) -> UserModel:
     user.db_id = result.inserted_id
     return user
 
+
 def get_tg_username(db_id: ObjectId) -> str:
     result = users_collection.find_one({"_id": db_id})
     return result["tg_nickname"]
+
 
 def increment_counter(db_id: ObjectId) -> int:
     """Increment ping counter for a given user by 1 and return resulting value."""
     users_collection.update_one({"_id": db_id}, {"$inc": {"ping_counter": 1}})
     return get_counter(db_id)
 
+
 def get_counter(db_id: ObjectId) -> int:
     """Find and return ping counter for a given user."""
     result = users_collection.find_one({"_id": db_id})
     return result["ping_counter"]
 
+
 # def insert_game_room(game_id, game_name, users):
 #     game_room = {"game_id": game_id, "game_name": game_name, "users": users}
 #     game_rooms_collection.insert_one(game_room)
-
-
-

@@ -76,6 +76,7 @@ def load_config() -> DBConfig:
     with path.open() as file:
         return DBConfig(**yaml.safe_load(file))
 
+
 def main():
     cfg = load_config()
     client = MongoClient(cfg.address)
