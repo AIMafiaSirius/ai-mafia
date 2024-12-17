@@ -42,15 +42,15 @@ def get_tg_username(db_id: ObjectId) -> str:
 
 
 def increment_counter(db_id: ObjectId) -> int:
-    """Increment ping counter for a given user by 1 and return resulting value."""
-    users_collection.update_one({"_id": db_id}, {"$inc": {"ping_counter": 1}})
+    """Increment win counter for a given user by 1 and return resulting value."""
+    users_collection.update_one({"_id": db_id}, {"$inc": {"win_counter": 1}})
     return get_counter(db_id)
 
 
 def get_counter(db_id: ObjectId) -> int:
-    """Find and return ping counter for a given user."""
+    """Find and return win counter for a given user."""
     result = users_collection.find_one({"_id": db_id})
-    return result["ping_counter"]
+    return result["win_counter"]
 
 
 # def insert_game_room(game_id, game_name, users):

@@ -1,11 +1,14 @@
+import os
 import random
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from chatsky import (
     PRE_RESPONSE,
+    PRE_TRANSITION,
     RESPONSE,
     TRANSITIONS,
-    BaseCondition,
+    BaseProcessing,
     BaseResponse,
     Context,
     MessageInitTypes,
@@ -23,14 +26,23 @@ from chatsky import (
 from chatsky import (
     responses as rsp,
 )
+from chatsky.messengers.telegram import LongpollingInterface
 from chatsky.processing import ModifyResponse
+from dotenv import load_dotenv
 
+from ai_mafia.db.routines import add_user, find_user, increment_counter
+
+if TYPE_CHECKING:
+    import telegram as tg
+
+    from ai_mafia.db.models import UserModel
+
+load_dotenv()
 
 class Room:
     def __init__(self, name):
         self.name = name
         self.players = []
-
 
 map_room = {}
 
@@ -51,13 +63,39 @@ class RandomID(ModifyResponse):
         return "Id: " + str(cur_id) + "\n" + "Комната: " + str(name) + "\n" + "Присоединиться?"
 
 
+class InitSessionProcessing(BaseProcessing):
+    """
+    Add user tg id to database.
+    """
+
+    async def call(self, ctx: Context):
+        tg_info: tg.Update = ctx.last_request.original_message
+        tg_id = tg_info.effective_user.id
+        user_nickname = tg_info.effective_user.name
+        user_info = find_user(tg_id)
+        if user_info is None:
+            user_info = add_user(tg_id, user_nickname)
+        ctx.misc["user_info"] = user_info
+
+
+class GreetingResponse(BaseResponse):
+    """
+    Greet and provide info about user
+    """
+
+    async def call(self, ctx: Context):
+        user_info: UserModel = ctx.misc["user_info"]
+        return f"Привет, {user_info.tg_nickname}!"
+
+
 greeting_script = {
     "greeting_flow": {
         "start_node": {
+            PRE_TRANSITION: {"init": InitSessionProcessing()},
             TRANSITIONS: [Tr(dst="greeting_node", cnd=cnd.ExactMatch("/start"))],
         },
         "greeting_node": {
-            RESPONSE: "Привет! Нужна ли вам инструкция по игре?",
+            RESPONSE: GreetingResponse(),
             TRANSITIONS: [
                 Tr(dst=("instruction"), cnd=cnd.ExactMatch("Да")),
                 Tr(dst=("to_room_flow", "choose"), cnd=cnd.ExactMatch("Нет")),
