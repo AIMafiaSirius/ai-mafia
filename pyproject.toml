@@ -7,7 +7,11 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-chatsky = "^0.9.0"
+chatsky = {extras = ["telegram"], version = "^0.9.0"}
+python-dotenv = "^1.0.1"
+pymongo = "^4.10.1"
+pydantic = "^2.10.3"
+pyyaml = "^6.0.2"
 
 [tool.poetry.group.dev]
 optional = true
@@ -34,6 +38,8 @@ ignore = [
     "FBT",     # boolean trap
     "D",       # docstrings
     "ANN",     # type annotations
+    "T201",    # print statements
+    "RUF001",  # cyrillic letters
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -48,6 +54,9 @@ testpaths = [
     "tests",
 ]
 pythonpath = "ai_mafia"
+
+[tool.poetry.scripts]
+"setup_db" = "ai_mafia.db.setup:main"
 
 [build-system]
 requires = ["poetry-core"]
