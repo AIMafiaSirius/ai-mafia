@@ -15,5 +15,16 @@ class UserModel(BaseModel):
     tg_nickname: str
     """User's telegram nickname"""
 
-    ping_counter: int = 0
-    """Total number of pings from this user from all his sessions."""
+
+    number: int = None
+    """"user number"""
+
+class Player:
+    user_id: ObjectId
+
+    role: str | None = None
+
+    is_alive: bool = True
+
+    def __init__(self, user: UserModel):
+        self.user_id = user.db_id
