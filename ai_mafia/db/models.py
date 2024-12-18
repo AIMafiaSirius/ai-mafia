@@ -28,7 +28,6 @@ class UserModel(BaseModel):
 
 
 class Player:
-
     user_id: ObjectId | None
 
     role: str | None = None
@@ -37,7 +36,6 @@ class Player:
 
     def __init__(self, user: UserModel):
         self.user_id = user.db_id
-
 
 
 class RoomModel(BaseModel):

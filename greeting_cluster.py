@@ -1,7 +1,5 @@
 import os
-import random
 from typing import TYPE_CHECKING
-from uuid import uuid4
 
 from chatsky import (
     PRE_RESPONSE,
@@ -23,27 +21,28 @@ from chatsky import (
 from chatsky import (
     destinations as dst,
 )
-from chatsky import (
-    responses as rsp,
-)
 from chatsky.messengers.telegram import LongpollingInterface
 from chatsky.processing import ModifyResponse
 from dotenv import load_dotenv
 
-from ai_mafia.db.routines import add_game_room, add_user, find_game_room, find_user, get_random_room, increment_counter
+from ai_mafia.db.routines import add_game_room, add_user, find_user, get_random_room
 
 if TYPE_CHECKING:
     import telegram as tg
 
-    from ai_mafia.db.models import RoomModel, UserModel
+    from ai_mafia.db.models import UserModel
 
 load_dotenv()
 
-class NewRoom(BaseResponse):
-    async def call(self, ctx: Context) -> MessageInitTypes:
+
+class NewRoom(ModifyResponse):
+    async def modified_response(self, _: BaseResponse, ctx: Context) -> MessageInitTypes:
         name = str(ctx.last_request.text)
         room = add_game_room(name)
-        return f"Данные по комнате \n Id: {room.room_id} \n Название: {name} \n Число участников: {len(room.list_users)}/10 \n Присоединиться?"
+        return f"Данные по комнате \n\
+            Id: {room.room_id} \n\
+            Название: {name} \n\
+            Число участников: {len(room.list_users)}/10"
 
 
 class RandomGameRoom(ModifyResponse):
@@ -51,7 +50,10 @@ class RandomGameRoom(ModifyResponse):
         room = get_random_room()
         if room is None:
             return "К сожалению сейчас нет открытых игр, создайте свою комнату или попробуйте позже."
-        return f"Данные по комнате \n Id: {room.room_id} \n Название: {room.name} \n Число участников: {len(room.list_users)}/10 \n Присоединиться?"
+        return f"Данные по комнате: \n\
+            Id: {room.room_id} \n\
+            Название: {room.name} \n\
+            Число участников: {len(room.list_users)}/10"
 
 
 class InitSessionProcessing(BaseProcessing):
@@ -76,7 +78,7 @@ class GreetingResponse(BaseResponse):
 
     async def call(self, ctx: Context):
         user_info: UserModel = ctx.misc["user_info"]
-        return f"Привет, {user_info.tg_nickname}!"
+        return f"Привет, {user_info.tg_nickname}! Вам нужна инструкция по игре?"
 
 
 greeting_script = {
@@ -84,7 +86,7 @@ greeting_script = {
         "start_node": {},
         "fallback_node": {
             RESPONSE: "К сожалению я не могу обработать такую команду, введите другую",
-            TRANSITIONS: [Tr(dst=dst.FromHistory.Previous())],
+            TRANSITIONS: [Tr(dst=dst.Previous())],
         },
     },
     "greeting_flow": {
@@ -117,7 +119,8 @@ greeting_script = {
             TRANSITIONS: [Tr(dst=("new"))],
         },
         "new": {
-            RESPONSE: NewRoom(),
+            PRE_RESPONSE: {"new_room_service": NewRoom()},
+            RESPONSE: "Присоединиться?",
             TRANSITIONS: [
                 Tr(dst=("choose"), cnd=cnd.ExactMatch("Назад")),
                 Tr(dst=("in_room_flow", "not_ready"), cnd=cnd.ExactMatch("Да")),
@@ -131,7 +134,7 @@ greeting_script = {
         },
         "random_id": {
             PRE_RESPONSE: {"random_id_service": RandomGameRoom()},
-            RESPONSE: "",
+            RESPONSE: "Присоединиться?",
             TRANSITIONS: [
                 Tr(dst=("choose"), cnd=cnd.ExactMatch("Назад")),
                 Tr(dst=("in_room_flow", "not_ready"), cnd=cnd.ExactMatch("Да")),
@@ -143,22 +146,23 @@ greeting_script = {
             RESPONSE: "Нажмите готов для подтверждения игры",
             TRANSITIONS: [
                 Tr(dst=("ready"), cnd=cnd.ExactMatch("Готов")),
-                Tr(dst=("to_room_flow", "choose"), cnd=cnd.ExactMatch("Выйти"))
+                Tr(dst=("to_room_flow", "choose"), cnd=cnd.ExactMatch("Выйти")),
             ],
         },
         "ready": {
             RESPONSE: "Пожалуйста ожидайте начало игры",
-            TRANSITIONS: [
-                Tr(dst=("to_room_flow", "choose"), cnd=cnd.ExactMatch("Выйти"))
-            ],
+            TRANSITIONS: [Tr(dst=("to_room_flow", "choose"), cnd=cnd.ExactMatch("Выйти"))],
         },
     },
 }
+
+interface = LongpollingInterface(token=os.environ["TG_TOKEN"])
 
 pipeline = Pipeline(
     greeting_script,
     start_label=("greeting_flow", "start_node"),
     fallback_label=("global_flow", "fallback_node"),
+    messenger_interface=interface,
 )
 
 if __name__ == "__main__":
