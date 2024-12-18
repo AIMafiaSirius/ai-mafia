@@ -15,16 +15,12 @@ class UserModel(BaseModel):
     tg_nickname: str
     """User's telegram nickname"""
 
+    room_id: ObjectId | None
+    """Id of a room there user currently in"""
 
-    number: int = None
-    """"user number"""
+    win_counter: int = 0
+    """Total number of wins from this user from all his sessions."""
 
-class Player:
-    user_id: ObjectId
+    game_counter: int = 0
+    """Total number of played games from this user from all his sessions."""
 
-    role: str | None = None
-
-    is_alive: bool = True
-
-    def __init__(self, user: UserModel):
-        self.user_id = user.db_id
