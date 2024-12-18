@@ -1,7 +1,10 @@
+import random
+from uuid import uuid4
+
 from bson.objectid import ObjectId
 from pymongo import MongoClient
 
-from .models import UserModel
+from .models import RoomModel, UserModel
 from .setup import load_config
 
 config = load_config()
@@ -52,6 +55,35 @@ def get_counter(db_id: ObjectId) -> int:
     result = users_collection.find_one({"_id": db_id})
     return result["win_counter"]
 
+
+def find_game_room(room_id: uuid4) -> RoomModel | None:
+    """
+    If info about this game room is stored in our database,
+    return it. Otherwise, return None.
+    """
+    result = rooms_collection.find_one({"room_id": room_id})
+    if result is None:
+        return None
+    return RoomModel(**result)
+
+
+def add_game_room(name_room: str) -> RoomModel:
+    game_room_id = uuid4()
+    room = RoomModel(name=name_room, room_id=game_room_id)
+    result = rooms_collection.insert_one(room.model_dump())
+    room.db_id = result.inserted_id
+    return room
+
+
+def get_random_room() -> RoomModel | None:
+    """
+    If any game room open, randomly return one of them.
+    Otherwise, return None.
+    """
+    list_room = rooms_collection.list_indexes({"is_game_start": True})
+    if list_room is None:
+        return None
+    return rooms_collection.find_one(random.choice(list_room))
 
 # def insert_game_room(game_id, game_name, users):
 #     game_room = {"game_id": game_id, "game_name": game_name, "users": users}
