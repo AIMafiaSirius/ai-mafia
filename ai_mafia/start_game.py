@@ -18,7 +18,8 @@ if TYPE_CHECKING:
 
 players = ["id1", "id2", "id3", "id4", "id5", "id6", "id7", "id8", "id9", "id10"]
 players_role = ["комиссар", "мафия", "мафия", "дон", "мирный", "мирный", "мирный", "мирный", "мирный", "мирный"]
-cnt: int = 0
+
+gamers = {}
 
 def mix(arr):
     for i in range(len(arr)):
@@ -26,26 +27,22 @@ def mix(arr):
         arr[i], arr[r] = arr[r], arr[i]
     return arr
 
-mix(players)
-mix(players_role)
-
-gamers = []
-
 def get_role_for_all():
     for i in range(10):
         gamers.append(Player)
-        gamers[i].user_id = i
-        gamers[i].role = players_role[i]
-        gamers[i].is_alive = True
+        gamers[players[i]].user_id = i
+        gamers[players[i]].role = players_role[i]
+        gamers[players[i]].is_alive = True
 
+mix(players)
+mix(players_role)
+get_role_for_all()
 
 class GetCards(BaseResponse):
-    get_role_for_all()
     async def call(self, ctx: Context):
         players_info: Player = ctx.misc["user_info"]
-        up_to_date_counter = increment_counter(players_info.db_id)
-        players_info.ping_counter = up_to_date_counter
-        return f"Игрок номер {players_info.number} ваша карта: {players_info.role}"
+        get_id = players_info.tg_id
+        return f"Игрок номер {gamers[get_id].number} ваша карта: {gamers[get_id].role}"
 
 
 get_card_script = {
