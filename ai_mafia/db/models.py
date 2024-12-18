@@ -17,9 +17,6 @@ class UserModel(BaseModel):
     tg_nickname: str
     """User's telegram nickname"""
 
-    room_id: ObjectId | None
-    """Id of a room there user currently in"""
-
     win_counter: int = 0
     """Total number of wins from this user from all his sessions."""
 
@@ -45,7 +42,7 @@ class RoomModel(BaseModel):
 
     db_id: ObjectId | None = Field(default=None, alias="_id", description="Unique identifier in mongo db")
 
-    room_id: uuid4
+    room_id: str = str(int(uuid4()))
     """Usable room's id for users"""
 
     name: str
@@ -53,5 +50,5 @@ class RoomModel(BaseModel):
 
     is_game_start: bool = False
 
-    list_users: list
+    list_users: list = []
     """List of user's tg id in the game room"""

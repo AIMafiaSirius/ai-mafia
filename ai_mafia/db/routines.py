@@ -1,5 +1,5 @@
 import random
-from uuid import uuid4
+from uuid import UUID
 
 from bson.objectid import ObjectId
 from pymongo import MongoClient
@@ -56,7 +56,7 @@ def get_counter(db_id: ObjectId) -> int:
     return result["win_counter"]
 
 
-def find_game_room(room_id: uuid4) -> RoomModel | None:
+def find_game_room(room_id: UUID) -> RoomModel | None:
     """
     If info about this game room is stored in our database,
     return it. Otherwise, return None.
@@ -68,8 +68,8 @@ def find_game_room(room_id: uuid4) -> RoomModel | None:
 
 
 def add_game_room(name_room: str) -> RoomModel:
-    game_room_id = uuid4()
-    room = RoomModel(name=name_room, room_id=game_room_id)
+    """Add new game room and store info in database, return created room"""
+    room = RoomModel(name=name_room)
     result = rooms_collection.insert_one(room.model_dump())
     room.db_id = result.inserted_id
     return room

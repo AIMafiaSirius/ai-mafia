@@ -39,10 +39,10 @@ class NewRoom(ModifyResponse):
     async def modified_response(self, _: BaseResponse, ctx: Context) -> MessageInitTypes:
         name = str(ctx.last_request.text)
         room = add_game_room(name)
-        return f"Данные по комнате \n\
-            Id: {room.room_id} \n\
-            Название: {name} \n\
-            Число участников: {len(room.list_users)}/10"
+        return f"Данные по комнате:\
+        \nId: {room.room_id}\
+        \nНазвание: {name}\
+        \nЧисло участников: {len(room.list_users)}/10"
 
 
 class RandomGameRoom(ModifyResponse):
@@ -50,10 +50,10 @@ class RandomGameRoom(ModifyResponse):
         room = get_random_room()
         if room is None:
             return "К сожалению сейчас нет открытых игр, создайте свою комнату или попробуйте позже."
-        return f"Данные по комнате: \n\
-            Id: {room.room_id} \n\
-            Название: {room.name} \n\
-            Число участников: {len(room.list_users)}/10"
+        return f"Данные по комнате:\
+            \nId: {room.room_id}\
+            \nНазвание: {room.name}\
+            \nЧисло участников: {len(room.list_users)}/10"
 
 
 class InitSessionProcessing(BaseProcessing):
