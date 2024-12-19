@@ -15,5 +15,12 @@ class UserModel(BaseModel):
     tg_nickname: str
     """User's telegram nickname"""
 
-    ping_counter: int = 0
-    """Total number of pings from this user from all his sessions."""
+    room_id: ObjectId | None
+    """Id of a room there user currently in"""
+
+    win_counter: int = 0
+    """Total number of wins from this user from all his sessions."""
+
+    game_counter: int = 0
+    """Total number of played games from this user from all his sessions."""
+
