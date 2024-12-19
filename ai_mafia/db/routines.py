@@ -4,13 +4,13 @@ from pymongo import MongoClient
 from .models import UserModel
 from .setup import load_config
 
-config = load_config()
+config = load_config().db
 
 # Connect to the MongoDB server
-client = MongoClient(config.address)
+client = MongoClient(host=config.host, port=config.port)
 
 # Select the database
-db = client.get_database(config.db_name)
+db = client.get_database(config.name)
 
 # Select the collections
 users_collection = db.get_collection("users")

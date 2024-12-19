@@ -1,0 +1,8 @@
+db:
+  clear_previous: true
+  host: "localhost"
+  port: "27017"
+  name: "mafia_db"
+chatsky:
+  host: "localhost"
+  port: "8012"
