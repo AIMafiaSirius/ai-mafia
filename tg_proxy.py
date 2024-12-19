@@ -7,6 +7,7 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CallbackContext, MessageHandler, filters
 
 from ai_mafia.config import load_config
+from ai_mafia.tg_proxy import tg_update_to_chatsky_message
 
 load_dotenv()
 
@@ -18,8 +19,8 @@ config = load_config().chatsky
 
 async def handle_message(update: Update, _: CallbackContext) -> None:
     try:
-        # TODO convert tg.Update to chatsky.Message
-        response = requests.post(config.chat_endpoint, json={"text": update.message.text}, timeout=5)  # noqa: ASYNC210
+        msg = tg_update_to_chatsky_message(update).model_dump(mode="json")
+        response = requests.post(config.chat_endpoint, json=msg, timeout=5)  # noqa: ASYNC210
         response.raise_for_status()
         await update.message.reply_text("Message forwarded successfully!")
     except requests.exceptions.RequestException as e:

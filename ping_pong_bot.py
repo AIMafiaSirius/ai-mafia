@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING
 
 import chatsky.conditions as cnd
 import chatsky.destinations as dst
+import telegram as tg
 import uvicorn
 from chatsky import PRE_TRANSITION, RESPONSE, TRANSITIONS, BaseProcessing, BaseResponse, Context, Message, Pipeline
 from chatsky import Transition as Tr
@@ -13,8 +14,6 @@ from ai_mafia.config import load_config
 from ai_mafia.db.routines import add_user, find_user, increment_counter
 
 if TYPE_CHECKING:
-    import telegram as tg
-
     from ai_mafia.db.models import UserModel
 
 load_dotenv()
@@ -98,6 +97,7 @@ app = FastAPI()
 async def respond(
     user_message: Message,
 ):
+    user_message.original_message = tg.Update.de_json(user_message.original_message)
     context = await interface.on_request_async(user_message)
     return context.last_response
 
