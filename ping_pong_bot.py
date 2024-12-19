@@ -96,10 +96,9 @@ app = FastAPI()
 
 @app.post("/chat", response_model=Message)
 async def respond(
-    user_id: str,
     user_message: Message,
 ):
-    context = await interface.on_request_async(user_message, user_id)
+    context = await interface.on_request_async(user_message)
     return context.last_response
 
 
