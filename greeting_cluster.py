@@ -203,7 +203,7 @@ async def respond(
 pipeline = Pipeline(
     greeting_script,
     start_label=("greeting_flow", "start_node"),
-    fallback_label=("greeting_flow", "fallback_node"),
+    fallback_label=("global_flow", "fallback_node"),
     messenger_interface=interface,
 )
 
