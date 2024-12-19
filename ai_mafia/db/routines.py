@@ -1,5 +1,4 @@
 import random
-from uuid import UUID
 
 from bson.objectid import ObjectId
 from pymongo import MongoClient
@@ -56,7 +55,7 @@ def get_counter(db_id: ObjectId) -> int:
     return result["win_counter"]
 
 
-def find_game_room(room_id: UUID) -> RoomModel | None:
+def find_game_room(room_id: str) -> RoomModel | None:
     """
     If info about this game room is stored in our database,
     return it. Otherwise, return None.
