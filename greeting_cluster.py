@@ -19,6 +19,7 @@ from chatsky import Transition as Tr
 from dotenv import load_dotenv
 
 from ai_mafia.config import load_config
+from ai_mafia.db.models import RoomModel
 from ai_mafia.db.routines import add_game_room, add_user, find_game_room, find_user, get_random_room
 from ai_mafia.sync import send_ready_signal
 from ai_mafia.tg_proxy import chatsky_web_api, chatsky_web_interface
@@ -26,30 +27,29 @@ from ai_mafia.tg_proxy import chatsky_web_api, chatsky_web_interface
 if TYPE_CHECKING:
     import telegram as tg
 
-    from ai_mafia.db.models import RoomModel, UserModel
+    from ai_mafia.db.models import UserModel
 
 load_dotenv()
+
+
+def room_info_string(room: RoomModel):
+    return f"""Данные по комнате:
+Id: {room.room_id}
+Название: {room.name}
+Число участников: {len(room.list_users)}/10"""
 
 
 class NewRoomResponse(BaseResponse):
     async def call(self, ctx: Context) -> MessageInitTypes:
         name = str(ctx.last_request.text)
         room = add_game_room(name)
-        return f"Данные по комнате:\
-        \nId: {room.room_id}\
-        \nНазвание: {name}\
-        \nЧисло участников: {len(room.list_users)}/10"
+        return room_info_string(room)
 
 
-class RandomRoomResponse(BaseResponse):
+class JoinRandomRoomResponse(BaseResponse):
     async def call(self, ctx: Context) -> MessageInitTypes:
         room: RoomModel = ctx.misc["room_info"]
-        return f"""Данные по комнате:
-Id: {room.room_id}
-Название: {room.name}
-Число участников: {len(room.list_users)}/10
-
-Присоединиться?"""
+        return room_info_string(room) + "\n\nПрисоединиться?"
 
 
 class RandomRoomExistCondition(BaseCondition):
@@ -154,7 +154,10 @@ greeting_script = {
                     dst=("random_not_found"),
                     cnd=cnd.All(cnd.ExactMatch("К случайной"), cnd.Not(RandomRoomExistCondition())),
                 ),
-                Tr(dst="join_id", cnd=cnd.All(cnd.Not(cnd.ExactMatch("К случайной")), RoomExistCondition())),
+                Tr(
+                    dst=("in_room_flow", "not_ready"),
+                    cnd=cnd.All(cnd.Not(cnd.ExactMatch("К случайной")), RoomExistCondition()),
+                ),
                 Tr(
                     dst="room_not_found",
                     cnd=cnd.All(cnd.Not(cnd.ExactMatch("К случайной")), cnd.Not(RoomExistCondition())),
@@ -169,18 +172,17 @@ greeting_script = {
             ],
         },
         "random_id": {
-            RESPONSE: RandomRoomResponse(),
+            RESPONSE: JoinRandomRoomResponse(),
             TRANSITIONS: [
                 Tr(dst="choose", cnd=cnd.ExactMatch("Назад")),
                 Tr(dst=("in_room_flow", "not_ready"), cnd=cnd.ExactMatch("Да")),
             ],
         },
-        "join_id": {RESPONSE: "вы присоединились к комнате"},
         "room_not_found": {RESPONSE: "комната с таким ID не найдена"},
     },
     "in_room_flow": {
         "not_ready": {
-            RESPONSE: "Нажмите готов для подтверждения игры",
+            RESPONSE: "Вы присоединились к комнате. Введите 'Готов', если готовы начать",
             TRANSITIONS: [
                 Tr(dst=("waiting"), cnd=cnd.ExactMatch("Готов")),
                 Tr(dst=("to_room_flow", "choose"), cnd=cnd.ExactMatch("Выйти")),

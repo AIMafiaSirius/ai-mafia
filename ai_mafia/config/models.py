@@ -12,7 +12,7 @@ class DBConfig(BaseModel):
         return f"mongodb://{self.host}:{self.port}/"
 
 
-class ChatskyConfig(BaseModel):
+class EndpointConfig(BaseModel):
     host: str
     port: int
 
@@ -23,6 +23,14 @@ class ChatskyConfig(BaseModel):
     def make_endpoint(self, name: str):
         return self.address + name
 
+
+class ChatskyConfig(EndpointConfig): ...
+
+
+class SynchronizerConfig(EndpointConfig): ...
+
+
 class AIMafiaConfig(BaseModel):
     db: DBConfig
     chatsky: ChatskyConfig
+    sync: SynchronizerConfig
