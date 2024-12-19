@@ -2,7 +2,6 @@ import os
 from typing import TYPE_CHECKING
 
 from chatsky import (
-    PRE_RESPONSE,
     PRE_TRANSITION,
     RESPONSE,
     TRANSITIONS,
@@ -22,7 +21,6 @@ from chatsky import (
     destinations as dst,
 )
 from chatsky.messengers.telegram import LongpollingInterface
-from chatsky.processing import ModifyResponse
 from dotenv import load_dotenv
 
 from ai_mafia.db.routines import add_game_room, add_user, find_user, get_random_room
@@ -35,8 +33,8 @@ if TYPE_CHECKING:
 load_dotenv()
 
 
-class NewRoom(ModifyResponse):
-    async def modified_response(self, _: BaseResponse, ctx: Context) -> MessageInitTypes:
+class NewRoomResponse(BaseResponse):
+    async def call(self, ctx: Context) -> MessageInitTypes:
         name = str(ctx.last_request.text)
         room = add_game_room(name)
         return f"Данные по комнате:\
@@ -45,8 +43,8 @@ class NewRoom(ModifyResponse):
         \nЧисло участников: {len(room.list_users)}/10"
 
 
-class RandomGameRoom(ModifyResponse):
-    async def modified_response(self, _: BaseResponse, __: Context) -> MessageInitTypes:
+class RandomRoomResponse(BaseResponse):
+    async def call(self, __: Context) -> MessageInitTypes:
         room = get_random_room()
         if room is None:
             return "К сожалению сейчас нет открытых игр, создайте свою комнату или попробуйте позже."
@@ -119,8 +117,7 @@ greeting_script = {
             TRANSITIONS: [Tr(dst=("new"))],
         },
         "new": {
-            PRE_RESPONSE: {"new_room_service": NewRoom()},
-            RESPONSE: "Присоединиться?",
+            RESPONSE: NewRoomResponse(),
             TRANSITIONS: [
                 Tr(dst=("choose"), cnd=cnd.ExactMatch("Назад")),
                 Tr(dst=("in_room_flow", "not_ready"), cnd=cnd.ExactMatch("Да")),
@@ -133,8 +130,7 @@ greeting_script = {
             ],
         },
         "random_id": {
-            PRE_RESPONSE: {"random_id_service": RandomGameRoom()},
-            RESPONSE: "Присоединиться?",
+            RESPONSE: RandomRoomResponse(),
             TRANSITIONS: [
                 Tr(dst=("choose"), cnd=cnd.ExactMatch("Назад")),
                 Tr(dst=("in_room_flow", "not_ready"), cnd=cnd.ExactMatch("Да")),

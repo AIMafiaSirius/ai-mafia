@@ -1,3 +1,4 @@
+from typing import Literal
 from uuid import uuid4
 
 from bson.objectid import ObjectId
@@ -35,6 +36,8 @@ class Player:
         self.user_id = user.db_id
 
 
+RoomState = Literal["created", "started", "ended"]
+
 class RoomModel(BaseModel):
     """Data model for storing info about room."""
 
@@ -48,7 +51,7 @@ class RoomModel(BaseModel):
     name: str
     """Name of this game room"""
 
-    is_game_start: bool = False
+    room_state: RoomState = "created"
 
     list_users: list = []
     """List of user's tg id in the game room"""

@@ -80,11 +80,11 @@ def get_random_room() -> RoomModel | None:
     If any game room open, randomly return one of them.
     Otherwise, return None.
     """
-    list_room = rooms_collection.list_indexes({"is_game_start": True})
-    if list_room is None:
+    list_room = list(rooms_collection.find({"room_state": "created"}))
+    if len(list_room) == 0:
         return None
-    return rooms_collection.find_one(random.choice(list_room))
-
+    room = random.choice(list_room)
+    return RoomModel(**room)
 
 # def insert_game_room(game_id, game_name, users):
 #     game_room = {"game_id": game_id, "game_name": game_name, "users": users}
