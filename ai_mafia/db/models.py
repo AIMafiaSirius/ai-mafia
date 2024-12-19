@@ -25,12 +25,14 @@ class UserModel(BaseModel):
     """Total number of played games from this user from all his sessions."""
 
 
+PlayerState = Literal["not_ready", "ready", "alive", "dead"]
+
 class Player:
     user_id: ObjectId | None
 
     role: str | None = None
 
-    is_alive: bool = True
+    state: PlayerState = "not_ready"
 
     def __init__(self, user: UserModel):
         self.user_id = user.db_id
@@ -53,5 +55,21 @@ class RoomModel(BaseModel):
 
     room_state: RoomState = "created"
 
-    list_users: list = []
+    list_users: list[Player] = []
     """List of user's tg id in the game room"""
+
+    def change_player_state(self, user_db_id: ObjectId, state: PlayerState):
+        for player in self.list_users:
+            if player.user_id == user_db_id:
+                player.state = state
+                break
+        else:
+            msg = "Something's wrong. Player not found"
+            raise ValueError(msg)
+
+    def is_room_ready(self):
+        """
+        check whether there are 10 ready players in the room
+        """
+        ready_count = sum(player.state == "ready" for player in self.list_users)
+        return ready_count == 10  # noqa: PLR2004

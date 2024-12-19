@@ -2,9 +2,9 @@ from typing import TYPE_CHECKING
 
 import chatsky.conditions as cnd
 import chatsky.destinations as dst
-import telegram as tg
 import uvicorn
 from chatsky import (
+    PRE_RESPONSE,
     PRE_TRANSITION,
     RESPONSE,
     TRANSITIONS,
@@ -12,19 +12,20 @@ from chatsky import (
     BaseProcessing,
     BaseResponse,
     Context,
-    Message,
     MessageInitTypes,
     Pipeline,
 )
 from chatsky import Transition as Tr
-from chatsky.messengers.common.interface import CallbackMessengerInterface
 from dotenv import load_dotenv
-from fastapi import FastAPI
 
 from ai_mafia.config import load_config
 from ai_mafia.db.routines import add_game_room, add_user, find_game_room, find_user, get_random_room
+from ai_mafia.sync import send_ready_signal
+from ai_mafia.tg_proxy import chatsky_web_api, chatsky_web_interface
 
 if TYPE_CHECKING:
+    import telegram as tg
+
     from ai_mafia.db.models import RoomModel, UserModel
 
 load_dotenv()
@@ -42,7 +43,7 @@ class NewRoomResponse(BaseResponse):
 
 class RandomRoomResponse(BaseResponse):
     async def call(self, ctx: Context) -> MessageInitTypes:
-        room: RoomModel = ctx.misc["room"]
+        room: RoomModel = ctx.misc["room_info"]
         return f"""Данные по комнате:
 Id: {room.room_id}
 Название: {room.name}
@@ -55,7 +56,7 @@ class RandomRoomExistCondition(BaseCondition):
     async def call(self, ctx: Context) -> MessageInitTypes:
         room = get_random_room()
         if room is not None:
-            ctx.misc["room"] = room
+            ctx.misc["room_info"] = room
             return True
         return False
 
@@ -64,7 +65,7 @@ class RoomExistCondition(BaseCondition):
     async def call(self, ctx: Context) -> MessageInitTypes:
         room = find_game_room(ctx.last_request.text)
         if room is not None:
-            ctx.misc["room"] = room
+            ctx.misc["room_info"] = room
             return True
         return False
 
@@ -92,6 +93,13 @@ class GreetingResponse(BaseResponse):
     async def call(self, ctx: Context):
         user_info: UserModel = ctx.misc["user_info"]
         return f"Привет, {user_info.tg_nickname}! Вам нужна инструкция по игре?"
+
+
+class CallSynchronizerProcessing(BaseProcessing):
+    async def call(self, ctx: Context):
+        user_info: UserModel = ctx.misc["user_info"]
+        room_info: RoomModel = ctx.misc["room_info"]
+        send_ready_signal(user_info.db_id, room_info.db_id, ctx.id)
 
 
 greeting_script = {
@@ -174,37 +182,27 @@ greeting_script = {
         "not_ready": {
             RESPONSE: "Нажмите готов для подтверждения игры",
             TRANSITIONS: [
-                Tr(dst=("ready"), cnd=cnd.ExactMatch("Готов")),
+                Tr(dst=("waiting"), cnd=cnd.ExactMatch("Готов")),
                 Tr(dst=("to_room_flow", "choose"), cnd=cnd.ExactMatch("Выйти")),
             ],
         },
-        "ready": {
-            RESPONSE: "Пожалуйста ожидайте начало игры",
-            TRANSITIONS: [Tr(dst=("to_room_flow", "choose"), cnd=cnd.ExactMatch("Выйти"))],
+        "waiting": {
+            PRE_RESPONSE: {"call_syncronizer": CallSynchronizerProcessing()},
+            RESPONSE: "Пожалуйста, ожидайте начало игры",
+            TRANSITIONS: [
+                Tr(dst=("to_room_flow", "choose"), cnd=cnd.ExactMatch("Выйти")),
+                Tr(dst=("in_game", "start_node"), cnd=cnd.ExactMatch("_ready_")),
+            ],
         },
     },
 }
-
-interface = CallbackMessengerInterface()
-
-app = FastAPI()
-
-
-@app.post("/chat", response_model=Message)
-async def respond(
-    user_message: Message,
-):
-    upd = tg.Update.de_json(user_message.original_message)
-    user_message.original_message = upd
-    context = await interface.on_request_async(user_message, upd.effective_user.id)
-    return context.last_response
 
 
 pipeline = Pipeline(
     greeting_script,
     start_label=("greeting_flow", "start_node"),
     fallback_label=("global_flow", "fallback_node"),
-    messenger_interface=interface,
+    messenger_interface=chatsky_web_interface,
 )
 
 config = load_config().chatsky
@@ -212,7 +210,7 @@ config = load_config().chatsky
 if __name__ == "__main__":
     pipeline.run()
     uvicorn.run(
-        app,
+        chatsky_web_api,
         host=config.host,
         port=config.port,
     )

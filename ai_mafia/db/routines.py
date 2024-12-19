@@ -85,6 +85,24 @@ def get_random_room() -> RoomModel | None:
     room = random.choice(list_room)
     return RoomModel(**room)
 
-# def insert_game_room(game_id, game_name, users):
-#     game_room = {"game_id": game_id, "game_name": game_name, "users": users}
-#     game_rooms_collection.insert_one(game_room)
+
+def mark_user_as_ready(user_db_id: ObjectId, room_db_id: ObjectId):
+    room = rooms_collection.find_one({"_id": room_db_id})
+    if room is None:
+        msg = "Something's wrong. Room not found"
+        raise RuntimeError(msg)
+    room_model = RoomModel(**room)
+    room_model.change_player_state(user_db_id, state="ready")
+
+
+def is_room_ready(room_db_id: ObjectId):
+    """
+    check whether there are 10 ready players in the room
+    """
+    # TODO async find_one
+    room = rooms_collection.find_one({"_id": room_db_id})
+    if room is None:
+        msg = "Something's wrong. Room not found"
+        raise RuntimeError(msg)
+    room_model = RoomModel(**room)
+    return room_model.is_room_ready()

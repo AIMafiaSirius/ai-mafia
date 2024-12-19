@@ -20,7 +20,7 @@ config = load_config().chatsky
 async def handle_message(update: Update, _: CallbackContext) -> None:
     try:
         msg = tg_update_to_chatsky_message(update).model_dump(mode="json")
-        response = requests.post(config.chat_endpoint, json=msg, timeout=5)  # noqa: ASYNC210
+        response = requests.post(config.make_endpoint("chat"), json=msg, timeout=5)  # noqa: ASYNC210
         response.raise_for_status()
         await update.message.reply_text(response.json()["text"])
     except requests.exceptions.RequestException as e:

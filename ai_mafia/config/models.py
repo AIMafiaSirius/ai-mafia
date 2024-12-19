@@ -20,9 +20,8 @@ class ChatskyConfig(BaseModel):
     def address(self):
         return f"http://{self.host}:{self.port}/"
 
-    @property
-    def chat_endpoint(self):
-        return self.address + "chat"
+    def make_endpoint(self, name: str):
+        return self.address + name
 
 class AIMafiaConfig(BaseModel):
     db: DBConfig
