@@ -1,6 +1,9 @@
-import os
 from typing import TYPE_CHECKING
 
+import chatsky.conditions as cnd
+import chatsky.destinations as dst
+import telegram as tg
+import uvicorn
 from chatsky import (
     PRE_TRANSITION,
     RESPONSE,
@@ -9,26 +12,19 @@ from chatsky import (
     BaseProcessing,
     BaseResponse,
     Context,
+    Message,
     MessageInitTypes,
     Pipeline,
 )
-from chatsky import (
-    Transition as Tr,
-)
-from chatsky import (
-    conditions as cnd,
-)
-from chatsky import (
-    destinations as dst,
-)
-from chatsky.messengers.telegram import LongpollingInterface
+from chatsky import Transition as Tr
+from chatsky.messengers.common.interface import CallbackMessengerInterface
 from dotenv import load_dotenv
+from fastapi import FastAPI
 
+from ai_mafia.config import load_config
 from ai_mafia.db.routines import add_game_room, add_user, find_game_room, find_user, get_random_room
 
 if TYPE_CHECKING:
-    import telegram as tg
-
     from ai_mafia.db.models import RoomModel, UserModel
 
 load_dotenv()
@@ -189,14 +185,34 @@ greeting_script = {
     },
 }
 
-interface = LongpollingInterface(token=os.environ["TG_TOKEN"])
+interface = CallbackMessengerInterface()
+
+app = FastAPI()
+
+
+@app.post("/chat", response_model=Message)
+async def respond(
+    user_message: Message,
+):
+    upd = tg.Update.de_json(user_message.original_message)
+    user_message.original_message = upd
+    context = await interface.on_request_async(user_message, upd.effective_user.id)
+    return context.last_response
+
 
 pipeline = Pipeline(
     greeting_script,
     start_label=("greeting_flow", "start_node"),
-    fallback_label=("global_flow", "fallback_node"),
+    fallback_label=("greeting_flow", "fallback_node"),
     messenger_interface=interface,
 )
 
+config = load_config().chatsky
+
 if __name__ == "__main__":
     pipeline.run()
+    uvicorn.run(
+        app,
+        host=config.host,
+        port=config.port,
+    )
