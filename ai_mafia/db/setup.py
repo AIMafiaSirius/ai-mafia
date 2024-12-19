@@ -1,9 +1,7 @@
-import importlib.resources as ires
-
-import yaml
-from pydantic import BaseModel
 from pymongo import MongoClient
 from pymongo.database import Database
+
+from ai_mafia.config import load_config
 
 
 def create_database(client: MongoClient, db_name: str = "mafia_database"):
@@ -64,24 +62,13 @@ def define_schema(db: Database):
     print("Schema defined successfully.")
 
 
-class DBConfig(BaseModel):
-    clear_previous: bool
-    address: str
-    db_name: str
-
-
-def load_config() -> DBConfig:
-    """Load configuration settings for mongo db"""
-    path = ires.files("ai_mafia.db").joinpath("config.yaml")
-    with path.open() as file:
-        return DBConfig(**yaml.safe_load(file))
-
 
 def main():
-    cfg = load_config()
-    client = MongoClient(cfg.address)
+    """create mongodb database"""
+    cfg = load_config().db
+    client = MongoClient(host=cfg.host, port=cfg.port)
 
     if cfg.clear_previous:
-        client.drop_database(cfg.db_name)
+        client.drop_database(cfg.name)
 
-    create_database(client, db_name=cfg.db_name)
+    create_database(client, db_name=cfg.name)
