@@ -1,11 +1,12 @@
 from bson.objectid import ObjectId
 from pymongo import MongoClient
 
-from .models import UserModel
+from .models import RoomModel, UserModel
 from .setup import load_config
 
 config = load_config()
 
+# Connect to the MongoDB server
 # Connect to the MongoDB server
 client = MongoClient(config.address)
 
@@ -28,6 +29,19 @@ def find_user(tg_id: int) -> UserModel | None:
     return UserModel(**result)
 
 
+def find_room_by_user(tg_id: int) -> RoomModel | None:
+    """
+    if the user is in a room, it will return that room. Otherwise, return None.
+    """
+    user = find_user(tg_id)
+    if user.room_id is None:
+        return None
+    result = rooms_collection.find_one({"_id": user.room_id})
+    if result is None:
+        return None
+    return result
+
+
 def add_user(tg_id: int, tg_nickname: str) -> UserModel:
     """Add info about user to database and return full info about him."""
     user = UserModel(tg_id=tg_id, tg_nickname=tg_nickname)
@@ -41,16 +55,16 @@ def get_tg_username(db_id: ObjectId) -> str:
     return result["tg_nickname"]
 
 
-def increment_counter(db_id: ObjectId) -> int:
-    """Increment ping counter for a given user by 1 and return resulting value."""
-    users_collection.update_one({"_id": db_id}, {"$inc": {"ping_counter": 1}})
-    return get_counter(db_id)
+# def increment_counter(db_id: ObjectId) -> int:
+#     """Increment ping counter for a given user by 1 and return resulting value."""
+#     users_collection.update_one({"_id": db_id}, {"$inc": {"ping_counter": 1}})
+#     return get_counter(db_id)
 
 
-def get_counter(db_id: ObjectId) -> int:
-    """Find and return ping counter for a given user."""
-    result = users_collection.find_one({"_id": db_id})
-    return result["ping_counter"]
+# def get_counter(db_id: ObjectId) -> int:
+#     """Find and return ping counter for a given user."""
+#     result = users_collection.find_one({"_id": db_id})
+#     return result["ping_counter"]
 
 
 # def insert_game_room(game_id, game_name, users):
