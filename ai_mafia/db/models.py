@@ -28,15 +28,12 @@ class UserModel(BaseModel):
 PlayerState = Literal["not_ready", "ready", "alive", "dead"]
 
 
-class Player:
-    user_id: ObjectId | None
+class PlayerModel(BaseModel):
+    user_id: str | None
 
     role: str | None = None
 
     state: PlayerState = "not_ready"
-
-    def __init__(self, user: UserModel):
-        self.user_id = user.db_id
 
 
 RoomState = Literal["created", "started", "ended"]
@@ -57,12 +54,12 @@ class RoomModel(BaseModel):
 
     room_state: RoomState = "created"
 
-    list_users: list[Player] = []
+    list_users: list[PlayerModel] = []
     """List of user's tg id in the game room"""
 
     def change_player_state(self, user_db_id: ObjectId, state: PlayerState):
         for player in self.list_users:
-            if player.user_id == user_db_id:
+            if player.user_id == str(user_db_id):
                 player.state = state
                 break
         else:

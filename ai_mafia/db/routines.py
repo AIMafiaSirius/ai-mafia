@@ -3,7 +3,7 @@ import random
 from bson.objectid import ObjectId
 from pymongo import MongoClient
 
-from .models import RoomModel, UserModel
+from .models import PlayerModel, RoomModel, UserModel
 from .setup import load_config
 
 config = load_config().db
@@ -95,6 +95,10 @@ def mark_user_as_ready(user_db_id: ObjectId, room_db_id: ObjectId):
     room_model.change_player_state(user_db_id, state="ready")
 
 
+def show_rooms():
+    for doc in rooms_collection.find():
+        print(doc)
+
 def is_room_ready(room_db_id: ObjectId):
     """
     check whether there are 10 ready players in the room
@@ -106,3 +110,13 @@ def is_room_ready(room_db_id: ObjectId):
         raise RuntimeError(msg)
     room_model = RoomModel(**room)
     return room_model.is_room_ready()
+
+
+def join_room(user_db_id: ObjectId, room_db_id: ObjectId):
+    room = rooms_collection.find_one({"_id": room_db_id})
+    if room is None:
+        msg = "Something's wrong. Room not found"
+        raise RuntimeError(msg)
+    lst_users: list = room["list_users"]
+    lst_users.append(PlayerModel(user_id=str(user_db_id)).model_dump())
+    rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_users": lst_users}})

@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 
 from ai_mafia.config import load_config
 from ai_mafia.db.models import RoomModel
-from ai_mafia.db.routines import add_game_room, add_user, find_game_room, find_user, get_random_room
+from ai_mafia.db.routines import add_game_room, add_user, find_game_room, find_user, get_random_room, join_room
 from ai_mafia.sync import send_ready_signal
 from ai_mafia.tg_proxy import chatsky_web_api, chatsky_web_interface
 
@@ -100,6 +100,15 @@ class CallSynchronizerProcessing(BaseProcessing):
         user_info: UserModel = ctx.misc["user_info"]
         room_info: RoomModel = ctx.misc["room_info"]
         send_ready_signal(user_info.db_id, room_info.db_id, ctx.id)
+
+
+class JoinRoomProcessing(BaseProcessing):
+    """Implement room joining logic"""
+
+    async def call(self, ctx: Context):
+        user_info: UserModel = ctx.misc["user_info"]
+        room_info: RoomModel = ctx.misc["room_info"]
+        join_room(user_info.db_id, room_info.db_id)
 
 
 greeting_script = {
@@ -182,6 +191,7 @@ greeting_script = {
     },
     "in_room_flow": {
         "not_ready": {
+            PRE_RESPONSE: {"join_room": JoinRoomProcessing()},
             RESPONSE: "Вы присоединились к комнате. Введите 'Готов', если готовы начать",
             TRANSITIONS: [
                 Tr(dst=("waiting"), cnd=cnd.ExactMatch("Готов")),
