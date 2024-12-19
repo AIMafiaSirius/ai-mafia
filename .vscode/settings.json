@@ -1,3 +1,5 @@
 {
+    "makefile.configureOnOpen": false,
     "ruff.configuration": "pyproject.toml",
+    "python.REPL.enableREPLSmartSend": false
 }
