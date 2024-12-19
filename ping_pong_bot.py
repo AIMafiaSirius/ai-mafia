@@ -1,13 +1,15 @@
-import os
 from typing import TYPE_CHECKING
 
 import chatsky.conditions as cnd
 import chatsky.destinations as dst
-from chatsky import PRE_TRANSITION, RESPONSE, TRANSITIONS, BaseProcessing, BaseResponse, Context, Pipeline
+import uvicorn
+from chatsky import PRE_TRANSITION, RESPONSE, TRANSITIONS, BaseProcessing, BaseResponse, Context, Message, Pipeline
 from chatsky import Transition as Tr
-from chatsky.messengers.telegram import LongpollingInterface
+from chatsky.messengers.common.interface import CallbackMessengerInterface
 from dotenv import load_dotenv
+from fastapi import FastAPI
 
+from ai_mafia.config import load_config
 from ai_mafia.db.routines import add_user, find_user, increment_counter
 
 if TYPE_CHECKING:
@@ -87,7 +89,19 @@ ping_pong_script = {
     },
 }
 
-interface = LongpollingInterface(token=os.environ["TG_TOKEN"])
+interface = CallbackMessengerInterface()
+
+app = FastAPI()
+
+
+@app.post("/chat", response_model=Message)
+async def respond(
+    user_id: str,
+    user_message: Message,
+):
+    context = await interface.on_request_async(user_message, user_id)
+    return context.last_response
+
 
 pipeline = Pipeline(
     ping_pong_script,
@@ -96,5 +110,12 @@ pipeline = Pipeline(
     messenger_interface=interface,
 )
 
+config = load_config().chatsky
+
 if __name__ == "__main__":
     pipeline.run()
+    uvicorn.run(
+        app,
+        host=config.host,
+        port=config.port,
+    )
