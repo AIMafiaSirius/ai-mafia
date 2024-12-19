@@ -1,4 +1,5 @@
 import random
+from uuid import uuid4
 
 from bson.objectid import ObjectId
 from pymongo import MongoClient
@@ -66,9 +67,9 @@ def find_game_room(room_id: str) -> RoomModel | None:
     return RoomModel(**result)
 
 
-def add_game_room(name_room: str) -> RoomModel:
+def add_room(name_room: str) -> RoomModel:
     """Add new game room and store info in database, return created room"""
-    room = RoomModel(name=name_room)
+    room = RoomModel(name=name_room, room_id=str(uuid4().hex))
     result = rooms_collection.insert_one(room.model_dump())
     room.db_id = result.inserted_id
     return room
@@ -89,7 +90,7 @@ def get_random_room() -> RoomModel | None:
 def mark_user_as_ready(user_db_id: ObjectId, room_db_id: ObjectId):
     room = rooms_collection.find_one({"_id": room_db_id})
     if room is None:
-        msg = "Something's wrong. Room not found"
+        msg = "Что-то пошло не так. Комната не найдена"
         raise RuntimeError(msg)
     room_model = RoomModel(**room)
     room_model.change_player_state(user_db_id, state="ready")
@@ -101,12 +102,12 @@ def show_rooms():
 
 def is_room_ready(room_db_id: ObjectId):
     """
-    check whether there are 10 ready players in the room
+    Check whether there are 10 ready players in the room
     """
     # TODO async find_one
     room = rooms_collection.find_one({"_id": room_db_id})
     if room is None:
-        msg = "Something's wrong. Room not found"
+        msg = "Что-то пошло не так. Комната не найдена"
         raise RuntimeError(msg)
     room_model = RoomModel(**room)
     return room_model.is_room_ready()
@@ -115,8 +116,22 @@ def is_room_ready(room_db_id: ObjectId):
 def join_room(user_db_id: ObjectId, room_db_id: ObjectId):
     room = rooms_collection.find_one({"_id": room_db_id})
     if room is None:
-        msg = "Something's wrong. Room not found"
+        msg = "Что-то пошло не так. Комната не найдена"
         raise RuntimeError(msg)
-    lst_users: list = room["list_users"]
-    lst_users.append(PlayerModel(user_id=str(user_db_id)).model_dump())
-    rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_users": lst_users}})
+    lst_players: list = room["list_players"]
+    lst_players.append(PlayerModel(user_id=str(user_db_id)).model_dump())
+    rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": lst_players}})
+
+
+def exit_room(user_db_id: ObjectId, room_db_id: ObjectId):
+    room = rooms_collection.find_one({"_id": room_db_id})
+    if room is None:
+        msg = "Что-то пошло не так. Комната не найдена"
+        raise RuntimeError(msg)
+    exit_id = str(user_db_id)
+    lst_players: list = room["list_players"]
+    for i in range(len(lst_players)):
+        if lst_players[i].user_id == exit_id:
+            lst_players.pop(i)
+            break
+    rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": lst_players}})
