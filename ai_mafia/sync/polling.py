@@ -10,6 +10,7 @@ async def check_database(room_db_id: ObjectId):
     # TODO make async
     return is_room_ready(room_db_id)
 
+
 async def poll_database(room_db_id: ObjectId, ctx_id: str, interval: float):
     while True:
         result = await check_database(room_db_id)
@@ -19,6 +20,7 @@ async def poll_database(room_db_id: ObjectId, ctx_id: str, interval: float):
             send_room_is_ready_signal(ctx_id)
             break
         await asyncio.sleep(interval)
+
 
 async def start_polling(room_db_id: ObjectId, ctx_id: str, interval: float):
     print("Starting polling...")

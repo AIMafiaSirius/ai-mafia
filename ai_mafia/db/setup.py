@@ -62,7 +62,6 @@ def define_schema(db: Database):
     print("Schema defined successfully.")
 
 
-
 def main():
     """create mongodb database"""
     cfg = load_config().db

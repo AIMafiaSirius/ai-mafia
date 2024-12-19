@@ -27,6 +27,7 @@ class UserModel(BaseModel):
 
 PlayerState = Literal["not_ready", "ready", "alive", "dead"]
 
+
 class Player:
     user_id: ObjectId | None
 
@@ -39,6 +40,7 @@ class Player:
 
 
 RoomState = Literal["created", "started", "ended"]
+
 
 class RoomModel(BaseModel):
     """Data model for storing info about room."""
