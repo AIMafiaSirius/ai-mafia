@@ -92,7 +92,7 @@ class GreetingResponse(BaseResponse):
 
     async def call(self, ctx: Context):
         user_info: UserModel = ctx.misc["user_info"]
-        return f"Привет, {user_info.tg_nickname}! Вам нужна инструкция по игре?"
+        return f"Привет, {user_info.tg_nickname}! Вам нужны правила игры?"
 
 
 class CallSynchronizerProcessing(BaseProcessing):
@@ -132,7 +132,7 @@ greeting_script = {
             ],
         },
         "instruction": {
-            RESPONSE: "...",
+            RESPONSE: "Dfv",
             TRANSITIONS: [Tr(dst=("to_room_flow", "choose"))],
         },
     },
