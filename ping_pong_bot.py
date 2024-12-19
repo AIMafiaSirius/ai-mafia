@@ -97,8 +97,9 @@ app = FastAPI()
 async def respond(
     user_message: Message,
 ):
-    user_message.original_message = tg.Update.de_json(user_message.original_message)
-    context = await interface.on_request_async(user_message)
+    upd = tg.Update.de_json(user_message.original_message)
+    user_message.original_message = upd
+    context = await interface.on_request_async(user_message, upd.effective_user.id)
     return context.last_response
 
 
