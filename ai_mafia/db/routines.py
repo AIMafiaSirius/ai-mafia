@@ -95,7 +95,7 @@ def mark_user_as_ready(user_db_id: ObjectId, room_db_id: ObjectId) -> RoomModel:
         raise RuntimeError(msg)
     room_model = RoomModel(**room)
     room_model.change_player_state(str(user_db_id), state="ready")
-    list_players_dict = [player.dict() for player in room_model.list_players]
+    list_players_dict = [player.model_dump() for player in room_model.list_players]
     rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": list_players_dict}})
     return room_model
 
@@ -139,4 +139,7 @@ def exit_room(user_db_id: ObjectId, room_db_id: ObjectId):
         if lst_players[i].user_id == exit_id:
             lst_players.pop(i)
             break
+    else:
+        msg = "Something's wrong. User not found in the room"
+        raise ValueError(msg)
     rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": lst_players}})
