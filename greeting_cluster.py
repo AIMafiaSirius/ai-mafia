@@ -1,4 +1,5 @@
 import json
+from random import randint
 from typing import TYPE_CHECKING
 
 import chatsky.conditions as cnd
@@ -50,10 +51,18 @@ Id: {room.room_id}
 Число участников: {len(room.list_players)}/10"""
 
 
+def shuffle_list(arr: list):
+    for i in range(len(arr)):
+        j = randint(0, i)
+        arr[i], arr[j] = arr[j], arr[i]
+    return arr
+
+
 class NewRoomResponse(BaseResponse):
     async def call(self, ctx: Context) -> MessageInitTypes:
         name = ctx.last_request.text
         room = add_room(name)
+        ctx.misc["room_info"] = room
         return room_info_string(room) + "\n\nПрисоединиться?"
 
 
@@ -151,7 +160,14 @@ class CheckReadyProcessing(BaseProcessing):
             send_room_is_ready_signal(str(ctx.id))
 
 
-with open("game_rules.json") as file:  # noqa: PTH123
+class StartGameProcessing(BaseProcessing):
+    """Implement game starting logic"""
+
+    async def call(self, ctx: Context):
+        ...
+
+
+with open("game_rules.json", encoding="utf8") as file:  # noqa: PTH123
     game_rules_data = json.load(file)
 
 greeting_script = {
@@ -303,7 +319,10 @@ greeting_script = {
         },
     },
     "in_game": {
-        "start_node": {RESPONSE: "Игра началась"},
+        "start_node": {
+            PRE_RESPONSE: {"init_game": StartGameProcessing()},
+            RESPONSE: "Игра началась",
+        },
     },
 }
 

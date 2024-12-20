@@ -134,9 +134,9 @@ def exit_room(user_db_id: ObjectId, room_db_id: ObjectId):
         msg = "Something's wrong. Room not found"
         raise RuntimeError(msg)
     exit_id = str(user_db_id)
-    lst_players: list[PlayerModel] = room["list_players"]
+    lst_players: list = room["list_players"]
     for i in range(len(lst_players)):
-        if lst_players[i].user_id == exit_id:
+        if lst_players[i]["user_id"] == exit_id:
             lst_players.pop(i)
             break
     else:
