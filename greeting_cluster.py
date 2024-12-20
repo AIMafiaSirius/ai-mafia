@@ -113,7 +113,7 @@ class JoinRoomProcessing(BaseProcessing):
 
 
 with open("game_rules.json") as file:  # noqa: PTH123
-    data = json.load(file)
+    game_rules_data = json.load(file)
 
 greeting_script = {
     "global_flow": {
@@ -150,37 +150,37 @@ greeting_script = {
     },
     "rules_flow": {
         "game_rules": {
-            RESPONSE: data["full_rules"],
+            RESPONSE: game_rules_data["full_rules"],
             TRANSITIONS: [
                 Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
             ]
         },
         "game_roles": {
-            RESPONSE: data["roles"],
+            RESPONSE: game_rules_data["roles"],
             TRANSITIONS: [
                 Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
             ]
         },
         "day_phase": {
-            RESPONSE: data["game_phase"]["day"],
+            RESPONSE: game_rules_data["game_phase"]["day"],
             TRANSITIONS: [
                 Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
             ]
         },
         "voting_phase": {
-            RESPONSE: data["game_phase"]["voting"],
+            RESPONSE: game_rules_data["game_phase"]["voting"],
             TRANSITIONS: [
                 Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
             ]
         },
         "night_phase": {
-            RESPONSE: data["game_phase"]["night"],
+            RESPONSE: game_rules_data["game_phase"]["night"],
             TRANSITIONS: [
                 Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
             ]
         },
         "start_and_end": {
-            RESPONSE: data["game_phase"]["game_start_and_end"],
+            RESPONSE: game_rules_data["game_phase"]["game_start_and_end"],
             TRANSITIONS: [
                 Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
             ]
