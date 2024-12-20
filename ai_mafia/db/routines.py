@@ -94,8 +94,9 @@ def mark_user_as_ready(user_db_id: ObjectId, room_db_id: ObjectId) -> RoomModel:
         msg = "Что-то пошло не так. Комната не найдена"
         raise RuntimeError(msg)
     room_model = RoomModel(**room)
-    room_model.change_player_state(user_db_id, state="ready")
-    rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": room_model.list_player}})
+    room_model.change_player_state(str(user_db_id), state="ready")
+    list_players_dict = [player.dict() for player in room_model.list_players]
+    rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": list_players_dict}})
     return room_model
 
 

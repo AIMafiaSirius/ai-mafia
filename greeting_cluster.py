@@ -54,7 +54,7 @@ class NewRoomResponse(BaseResponse):
         return room_info_string(room) + "\n\nПрисоединиться?"
 
 
-class JoinRandomRoomResponse(BaseResponse):
+class JoinRoomResponse(BaseResponse):
     async def call(self, ctx: Context) -> MessageInitTypes:
         room: RoomModel = ctx.misc["room_info"]
         return room_info_string(room) + "\n\nПрисоединиться?"
@@ -105,9 +105,9 @@ class GreetingResponse(BaseResponse):
 
 class CheckReadyProcessing(BaseProcessing):
     async def call(self, ctx: Context):
-        room = mark_user_as_ready(ctx.misc["room_info"].db_id)
+        room = mark_user_as_ready(ctx.misc["user_info"].db_id, ctx.misc["room_info"].db_id)
         if room.is_room_ready():
-            send_room_is_ready_signal(ctx.id)
+            send_room_is_ready_signal(str(ctx.id))
 
 
 class JoinRoomProcessing(BaseProcessing):
@@ -176,13 +176,13 @@ greeting_script = {
         "enter_id": {
             RESPONSE: "Введите ID комнаты или присоединитесь к случайной",
             TRANSITIONS: [
-                Tr(dst=("random_id"), cnd=cnd.All(cnd.ExactMatch("К случайной"), RandomRoomExistCondition())),
+                Tr(dst=("join_id"), cnd=cnd.All(cnd.ExactMatch("К случайной"), RandomRoomExistCondition())),
                 Tr(
                     dst=("random_not_found"),
                     cnd=cnd.All(cnd.ExactMatch("К случайной"), cnd.Not(RandomRoomExistCondition())),
                 ),
                 Tr(
-                    dst=("in_room_flow", "not_ready"),
+                    dst=("join_id"),
                     cnd=cnd.All(cnd.Not(cnd.ExactMatch("К случайной")), RoomExistCondition()),
                 ),
                 Tr(
@@ -199,8 +199,8 @@ greeting_script = {
                 Tr(dst="enter_id", cnd=cnd.ExactMatch("Назад")),
             ],
         },
-        "random_id": {
-            RESPONSE: JoinRandomRoomResponse(),
+        "join_id": {
+            RESPONSE: JoinRoomResponse(),
             TRANSITIONS: [
                 Tr(dst="choose", cnd=cnd.ExactMatch("Назад")),
                 Tr(dst=("in_room_flow", "not_ready"), cnd=cnd.ExactMatch("Да")),
