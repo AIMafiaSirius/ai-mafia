@@ -1,3 +1,4 @@
+import json
 from typing import TYPE_CHECKING
 
 import chatsky.conditions as cnd
@@ -111,6 +112,9 @@ class JoinRoomProcessing(BaseProcessing):
         join_room(user_info.db_id, room_info.db_id)
 
 
+with open("game_rules.json") as file:  # noqa: PTH123
+    data = json.load(file)
+
 greeting_script = {
     "global_flow": {
         "start_node": {},
@@ -127,14 +131,60 @@ greeting_script = {
         "greeting_node": {
             RESPONSE: GreetingResponse(),
             TRANSITIONS: [
-                Tr(dst=("instruction"), cnd=cnd.ExactMatch("Да")),
+                Tr(dst=("get_rules"), cnd=cnd.ExactMatch("Да")),
                 Tr(dst=("to_room_flow", "choose"), cnd=cnd.ExactMatch("Нет")),
             ],
         },
-        "instruction": {
-            RESPONSE: "Dfv",
-            TRANSITIONS: [Tr(dst=("to_room_flow", "choose"))],
+        "get_rules": {
+            RESPONSE: "Вам нужны полные правила или какой-то определённый раздел?",
+            TRANSITIONS: [
+                Tr(dst=("to_room_flow", "choose"), cnd=cnd.ExactMatch("Назад")),
+                Tr(dst=("rules_flow", "game_rules"), cnd=cnd.ExactMatch("Полные")),
+                Tr(dst=("rules_flow", "game_roles"), cnd=cnd.ExactMatch("Роли")),
+                Tr(dst=("rules_flow", "day_phase"), cnd=cnd.ExactMatch("День")),
+                Tr(dst=("rules_flow", "voting_phase"), cnd=cnd.ExactMatch("Голосование")),
+                Tr(dst=("rules_flow", "night_phase"), cnd=cnd.ExactMatch("Ночь")),
+                Tr(dst=("rules_flow", "start_and_end"), cnd=cnd.ExactMatch("Начало и конец игры")),
+            ],
         },
+    },
+    "rules_flow": {
+        "game_rules": {
+            RESPONSE: data["full_rules"],
+            TRANSITIONS: [
+                Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
+            ]
+        },
+        "game_roles": {
+            RESPONSE: data["roles"],
+            TRANSITIONS: [
+                Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
+            ]
+        },
+        "day_phase": {
+            RESPONSE: data["game_phase"]["day"],
+            TRANSITIONS: [
+                Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
+            ]
+        },
+        "voting_phase": {
+            RESPONSE: data["game_phase"]["voting"],
+            TRANSITIONS: [
+                Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
+            ]
+        },
+        "night_phase": {
+            RESPONSE: data["game_phase"]["night"],
+            TRANSITIONS: [
+                Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
+            ]
+        },
+        "start_and_end": {
+            RESPONSE: data["game_phase"]["game_start_and_end"],
+            TRANSITIONS: [
+                Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
+            ]
+        }
     },
     "to_room_flow": {
         "choose": {
