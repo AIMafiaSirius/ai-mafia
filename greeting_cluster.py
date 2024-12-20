@@ -161,7 +161,7 @@ class CheckReadyProcessing(ModifyResponse):
         if room.is_room_ready():
             send_room_is_ready_signal(ctx.id, ctx.misc["chat_id"])
             return "Мы вас ждали!"
-        return await original_response()
+        return await original_response(ctx)
 
 
 class StartGameProcessing(BaseProcessing):
@@ -331,6 +331,9 @@ greeting_script = {
         "start_node": {
             PRE_RESPONSE: {"init_game": StartGameProcessing()},
             RESPONSE: "Игра началась",
+            TRANSITIONS: [
+                Tr(dst=dst.Previous(), cnd=cnd.ExactMatch("Назад"))
+            ]
         },
     },
 }

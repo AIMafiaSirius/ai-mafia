@@ -31,15 +31,14 @@ async def respond(
     return context.last_response
 
 
-async def send_message(chat_id: int, txt: str):
-    await asyncio.sleep(1)
-    await bot.send_message(chat_id=chat_id, text=txt)
+async def send_message(ctx_id: str, chat_id: int):
+    await asyncio.sleep(3)
+    context = await interface.on_request_async(Message(text="_ready_"), ctx_id)
+    await bot.send_message(chat_id=chat_id, text=context.last_response.text)
 
 
 def send_room_is_ready_signal(ctx_id: str, chat_id: int):
-    msg = Message(text="_ready_")
-    context = interface.on_request(msg, ctx_id)
-    asyncio.create_task(send_message(chat_id, context.last_response.text))  # noqa: RUF006
+    asyncio.create_task(send_message(ctx_id, chat_id))  # noqa: RUF006
 
 
 @app.post("/skip", response_model=Message)
