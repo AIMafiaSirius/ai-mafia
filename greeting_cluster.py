@@ -54,13 +54,31 @@ class NewRoomResponse(BaseResponse):
     async def call(self, ctx: Context) -> MessageInitTypes:
         name = ctx.last_request.text
         room = add_room(name)
-        return room_info_string(room) + "\n\nПрисоединиться?"
+
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("Да", callback_data="ok"),
+                    InlineKeyboardButton("Назад", callback_data="step_backward")
+                ]
+            ]
+        )
+        return Message(text=room_info_string(room) + "\n\nВсё верно?", reply_markup=keyboard)
 
 
 class JoinRoomResponse(BaseResponse):
     async def call(self, ctx: Context) -> MessageInitTypes:
         room: RoomModel = ctx.misc["room_info"]
-        return room_info_string(room) + "\n\nПрисоединиться?"
+
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("Назад", callback_data="step_backward"),
+                    InlineKeyboardButton("Да", callback_data="join"),
+                ]
+            ]
+        )
+        return Message(text=room_info_string(room) + "\n\nПрисоединиться?", reply_markup=keyboard)
 
 
 class RandomRoomExistCondition(BaseCondition):
@@ -143,7 +161,7 @@ class ShowRulesResponse(BaseResponse):
                     InlineKeyboardButton("Начало и конец игры", callback_data="start_and_end")
                 ],
                 [
-                    InlineKeyboardButton("Назад", callback_data="step_backward"),
+                    InlineKeyboardButton("Вернуться к игре", callback_data="step_backward"),
                 ]
             ]
         )
@@ -189,6 +207,94 @@ class CheckReadyProcessing(BaseProcessing):
             send_room_is_ready_signal(str(ctx.id))
 
 
+class ChooseRoomResponse(BaseResponse):
+    async def call(self, _: Context):
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("Создать", callback_data="create_room"),
+                    InlineKeyboardButton("Присоединиться", callback_data="join_room")
+                ]
+            ]
+        )
+        return Message(text="Вы хотите присоединться к комнате или создать новую?", reply_markup=keyboard)
+
+
+class AreYouReadyResponse(BaseResponse):
+    async def call(self, _: Context):
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("Выйти", callback_data="leave"),
+                    InlineKeyboardButton("Готов", callback_data="ready")
+                ]
+            ]
+        )
+        text = "Вы присоединились к комнате. Нажмите на кнопку \"готов\", когда будете готовы начать игру."  # noqa: Q003
+        return Message(text=text, reply_markup=keyboard)
+
+
+class EnterRoomResponse(BaseResponse):
+    async def call(self, _: Context):
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("К случайной", callback_data="to_random"),
+                ]
+            ]
+        )
+        return Message(text="Присоединитесь к случайной комнате, либо введите ID", reply_markup=keyboard)
+
+
+class RoomNotFoundResponse(BaseResponse):
+    async def call(self, _: Context):
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("Назад", callback_data="step_backward"),
+                ]
+            ]
+        )
+        return Message(text="Комната с таким ID не найдена", reply_markup=keyboard)
+
+
+class RandomNotFoundResponse(BaseResponse):
+    async def call(self, _: Context):
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("Да", callback_data="create"),
+                    InlineKeyboardButton("Назад", callback_data="step_backward")
+                ]
+            ]
+        )
+        return Message(text="Сейчас нет открытых комнат. Создать новую?", reply_markup=keyboard)
+
+
+class WaitingStartResponse(BaseResponse):
+    async def call(self, _: Context):
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("Выйти", callback_data="leave")
+                ]
+            ]
+        )
+        return Message(text="Пожалуйста, ожидайте начала игры", reply_markup=keyboard)
+
+
+class FallBackResponse(BaseResponse):
+    async def call(self, _: Context):
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("Назад", callback_data="step_backward")
+                ]
+            ]
+        )
+        return Message(text="К сожалению, я не могу обработать эту команду", reply_markup=keyboard)
+
+
 with open("game_rules.json") as file:  # noqa: PTH123
     game_rules_data = json.load(file)
 
@@ -196,8 +302,8 @@ greeting_script = {
     "global_flow": {
         "start_node": {},
         "fallback_node": {
-            RESPONSE: "К сожалению, я не могу обработать такую команду, введите другую",
-            TRANSITIONS: [Tr(dst=dst.Previous())],
+            RESPONSE: FallBackResponse(),
+            TRANSITIONS: [Tr(dst=dst.Previous(), cnd=CallbackCondition(query_string="step_backward"))],
         },
     },
     "greeting_flow": {
@@ -227,48 +333,48 @@ greeting_script = {
     },
     "rules_flow": {
         "game_rules": {
-            RESPONSE: RuleResponse("full_rules"),
+            RESPONSE: RuleResponse(name="full_rules"),
             TRANSITIONS: [
-                Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
+                Tr(dst=("greeting_flow", "get_rules"), cnd=CallbackCondition(query_string="step_backward")),
             ],
         },
         "game_roles": {
-            RESPONSE: RuleResponse["roles"],
+            RESPONSE: RuleResponse(name="roles"),
             TRANSITIONS: [
-                Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
+                Tr(dst=("greeting_flow", "get_rules"), cnd=CallbackCondition(query_string="step_backward")),
             ],
         },
         "day_phase": {
-            RESPONSE: RuleResponse["game_phase"]["day"],
+            RESPONSE: RuleResponse(name="day"),
             TRANSITIONS: [
-                Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
+                Tr(dst=("greeting_flow", "get_rules"), cnd=CallbackCondition(query_string="step_backward")),
             ],
         },
         "voting_phase": {
-            RESPONSE: RuleResponse["game_phase"]["voting"],
+            RESPONSE: RuleResponse(name="voting"),
             TRANSITIONS: [
-                Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
+                Tr(dst=("greeting_flow", "get_rules"), cnd=CallbackCondition(query_string="step_backward")),
             ],
         },
         "night_phase": {
-            RESPONSE: RuleResponse["game_phase"]["night"],
+            RESPONSE: RuleResponse(name="night"),
             TRANSITIONS: [
-                Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
+                Tr(dst=("greeting_flow", "get_rules"), cnd=CallbackCondition(query_string="step_backward")),
             ],
         },
         "start_and_end": {
-            RESPONSE: RuleResponse["game_phase"]["game_start_and_end"],
+            RESPONSE: RuleResponse(name="game_start_and_end"),
             TRANSITIONS: [
-                Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
+                Tr(dst=("greeting_flow", "get_rules"), cnd=CallbackCondition(query_string="step_backward")),
             ],
         },
     },
     "to_room_flow": {
         "choose": {
-            RESPONSE: "Создай комнату или присоединись к существующей",
+            RESPONSE: ChooseRoomResponse(),
             TRANSITIONS: [
-                Tr(dst=("enter_id"), cnd=cnd.ExactMatch("Присоединиться")),
-                Tr(dst=("make"), cnd=cnd.ExactMatch("Создать")),
+                Tr(dst=("enter_id"), cnd=CallbackCondition(query_string="join_room")),
+                Tr(dst=("make"), cnd=CallbackCondition(query_string="create_room")),
             ],
         },
         "make": {
@@ -278,64 +384,65 @@ greeting_script = {
         "new": {
             RESPONSE: NewRoomResponse(),
             TRANSITIONS: [
-                Tr(dst=("choose"), cnd=cnd.ExactMatch("Назад")),
-                Tr(dst=("in_room_flow", "not_ready"), cnd=cnd.ExactMatch("Да")),
+                Tr(dst=("choose"), cnd=CallbackCondition(query_string="step_backward")),
+                Tr(dst=("in_room_flow", "not_ready"), cnd=CallbackCondition(query_string="ok")),
             ],
         },
         "enter_id": {
-            RESPONSE: "Введите ID комнаты или присоединитесь к случайной",
+            RESPONSE: EnterRoomResponse(),
             TRANSITIONS: [
-                Tr(dst=("join_id"), cnd=cnd.All(cnd.ExactMatch("К случайной"), RandomRoomExistCondition())),
+                Tr(dst=("join_id"),
+                   cnd=cnd.All(CallbackCondition(query_string="to_random"), RandomRoomExistCondition())),
                 Tr(
                     dst=("random_not_found"),
-                    cnd=cnd.All(cnd.ExactMatch("К случайной"), cnd.Not(RandomRoomExistCondition())),
+                    cnd=cnd.All(CallbackCondition(query_string="to_random"),cnd.Not(RandomRoomExistCondition())),
                 ),
                 Tr(
                     dst=("join_id"),
-                    cnd=cnd.All(cnd.Not(cnd.ExactMatch("К случайной")), RoomExistCondition()),
+                    cnd=cnd.All(cnd.Not(CallbackCondition(query_string="to_random")), RoomExistCondition()),
                 ),
                 Tr(
                     dst="room_not_found",
-                    cnd=cnd.All(cnd.Not(cnd.ExactMatch("К случайной")), cnd.Not(RoomExistCondition())),
+                    cnd=cnd.All(cnd.Not(CallbackCondition(query_string="to_random")), cnd.Not(RoomExistCondition())),
                 ),
                 Tr(dst="choose", cnd=cnd.ExactMatch("Назад")),
             ],
         },
         "random_not_found": {
-            RESPONSE: "Сейчас нет открытых комнат. Создать новую?",
+            RESPONSE: RandomNotFoundResponse(),
             TRANSITIONS: [
-                Tr(dst="make", cnd=cnd.ExactMatch("Да")),
-                Tr(dst="enter_id", cnd=cnd.ExactMatch("Назад")),
+                Tr(dst="make", cnd=CallbackCondition(query_string="create")),
+                Tr(dst="enter_id", cnd=CallbackCondition(query_string="step_backward")),
             ],
         },
         "join_id": {
             RESPONSE: JoinRoomResponse(),
             TRANSITIONS: [
-                Tr(dst="choose", cnd=cnd.ExactMatch("Назад")),
-                Tr(dst=("in_room_flow", "not_ready"), cnd=cnd.ExactMatch("Да")),
+                Tr(dst="choose", cnd=CallbackCondition(query_string="step_backward")),
+                Tr(dst=("in_room_flow", "not_ready"), cnd=CallbackCondition(query_string="join")),
             ],
         },
         "room_not_found": {
-            RESPONSE: "Комната с таким ID не найдена",
-            TRANSITIONS: [Tr(dst=("enter_id"))],
+            RESPONSE: RoomNotFoundResponse(),
+            TRANSITIONS: [Tr(dst=("enter_id"), cnd=CallbackCondition(query_string="step_backward"))],
         },
     },
     "in_room_flow": {
         "not_ready": {
             PRE_RESPONSE: {"join_room": JoinRoomProcessing()},
-            RESPONSE: "Вы присоединились к комнате. Введите 'Готов', если готовы начать",
+            RESPONSE: AreYouReadyResponse(),
             PRE_TRANSITION: {"exit_room": ExitRoomProcessing()},
             TRANSITIONS: [
-                Tr(dst=("waiting"), cnd=cnd.ExactMatch("Готов")),
-                Tr(dst=("to_room_flow", "choose"), cnd=cnd.ExactMatch("Выйти")),
+                Tr(dst=("waiting"), cnd=CallbackCondition(query_string="ready")),
+                Tr(dst=("to_room_flow", "choose"), cnd=CallbackCondition(query_string="leave")),
             ],
         },
         "waiting": {
             PRE_RESPONSE: {"call_syncronizer": CheckReadyProcessing()},
-            RESPONSE: "Пожалуйста, ожидайте начало игры",
+            RESPONSE: WaitingStartResponse(),
             PRE_TRANSITION: {"exit_room": ExitRoomProcessing()},
             TRANSITIONS: [
-                Tr(dst=("to_room_flow", "choose"), cnd=cnd.ExactMatch("Выйти")),
+                Tr(dst=("to_room_flow", "choose"), cnd=CallbackCondition(query_string="leave")),
                 Tr(dst=("in_game", "start_node"), cnd=cnd.ExactMatch("_ready_")),
             ],
         },
