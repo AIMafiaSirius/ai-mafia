@@ -100,6 +100,7 @@ def show_rooms():
     for doc in rooms_collection.find():
         print(doc)
 
+
 def is_room_ready(room_db_id: ObjectId):
     """
     Check whether there are 10 ready players in the room

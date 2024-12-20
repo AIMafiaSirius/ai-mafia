@@ -28,7 +28,6 @@ PlayerState = Literal["not_ready", "ready", "alive", "dead"]
 
 
 class PlayerModel(BaseModel):
-
     user_id: str | None
 
     role: str | None = None
