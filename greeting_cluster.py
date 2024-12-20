@@ -1,4 +1,5 @@
 import json
+from random import randint
 from typing import TYPE_CHECKING
 
 import chatsky.conditions as cnd
@@ -18,6 +19,7 @@ from chatsky import (
     Pipeline,
 )
 from chatsky import Transition as Tr
+from chatsky.processing import ModifyResponse
 from dotenv import load_dotenv
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -50,10 +52,18 @@ Id: {room.room_id}
 Число участников: {len(room.list_players)}/10"""
 
 
+def shuffle_list(arr: list):
+    for i in range(len(arr)):
+        j = randint(0, i)
+        arr[i], arr[j] = arr[j], arr[i]
+    return arr
+
+
 class NewRoomResponse(BaseResponse):
     async def call(self, ctx: Context) -> MessageInitTypes:
         name = ctx.last_request.text
         room = add_room(name)
+        ctx.misc["room_info"] = room
         return room_info_string(room) + "\n\nПрисоединиться?"
 
 
@@ -94,6 +104,7 @@ class InitSessionProcessing(BaseProcessing):
         if user_info is None:
             user_info = add_user(tg_id, user_nickname)
         ctx.misc["user_info"] = user_info
+        ctx.misc["chat_id"] = tg_info.effective_chat.id
 
 
 class CallbackCondition(BaseCondition):
@@ -131,7 +142,7 @@ class JoinRoomProcessing(BaseProcessing):
     async def call(self, ctx: Context):
         user_info: UserModel = ctx.misc["user_info"]
         room_info: RoomModel = ctx.misc["room_info"]
-        join_room(user_info.db_id, room_info.db_id)
+        join_room(user_info.db_id, room_info.db_id, ctx.id, ctx.misc["chat_id"])
 
 
 class ExitRoomProcessing(BaseProcessing):
@@ -144,21 +155,35 @@ class ExitRoomProcessing(BaseProcessing):
             exit_room(user_info.db_id, room_info.db_id)
 
 
-class CheckReadyProcessing(BaseProcessing):
-    async def call(self, ctx: Context):
+class CheckReadyProcessing(ModifyResponse):
+    async def modified_response(self, original_response: BaseResponse, ctx: Context):
         room = mark_user_as_ready(ctx.misc["user_info"].db_id, ctx.misc["room_info"].db_id)
         if room.is_room_ready():
-            send_room_is_ready_signal(str(ctx.id))
+            send_room_is_ready_signal(ctx.misc["room_info"].room_id)
+            return "Мы вас ждали!"
+        return await original_response(ctx)
 
 
-with open("game_rules.json") as file:  # noqa: PTH123
+class StartGameProcessing(BaseProcessing):
+    """Implement game starting logic"""
+
+    async def call(self, ctx: Context): ...
+
+
+with open("game_rules.json", encoding="utf8") as file:  # noqa: PTH123
     game_rules_data = json.load(file)
+
+
+class FallbackResponse(BaseResponse):
+    async def call(self, ctx: Context):
+        txt = ctx.last_request.text
+        return f"К сожалению, я не могу обработать команду: {txt}"
+
 
 greeting_script = {
     "global_flow": {
-        "start_node": {},
         "fallback_node": {
-            RESPONSE: "К сожалению, я не могу обработать такую команду, введите другую",
+            RESPONSE: FallbackResponse(),
             TRANSITIONS: [Tr(dst=dst.Previous())],
         },
     },
@@ -295,7 +320,7 @@ greeting_script = {
         "waiting": {
             PRE_RESPONSE: {"call_syncronizer": CheckReadyProcessing()},
             RESPONSE: "Пожалуйста, ожидайте начало игры",
-            PRE_TRANSITION: {"exit_room": ExitRoomProcessing()},
+            # PRE_TRANSITION: {"exit_room": ExitRoomProcessing()},
             TRANSITIONS: [
                 Tr(dst=("to_room_flow", "choose"), cnd=cnd.ExactMatch("Выйти")),
                 Tr(dst=("in_game", "start_node"), cnd=cnd.ExactMatch("_ready_")),
@@ -303,7 +328,10 @@ greeting_script = {
         },
     },
     "in_game": {
-        "start_node": {RESPONSE: "Игра началась"},
+        "start_node": {
+            PRE_RESPONSE: {"init_game": StartGameProcessing()},
+            RESPONSE: "Игра началась",
+        },
     },
 }
 
