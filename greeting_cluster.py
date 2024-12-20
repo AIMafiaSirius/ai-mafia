@@ -1,5 +1,4 @@
 import json
-from random import randint
 from typing import TYPE_CHECKING
 
 import chatsky.conditions as cnd
@@ -33,13 +32,14 @@ from ai_mafia.db.routines import (
     get_random_room,
     join_room,
     mark_user_as_ready,
+    start_game,
 )
 from ai_mafia.tg_proxy import chatsky_web_api, chatsky_web_interface, send_room_is_ready_signal
 
 if TYPE_CHECKING:
     import telegram as tg
 
-    from ai_mafia.db.models import UserModel
+    from ai_mafia.db.models import PlayerModel, UserModel
 
 load_dotenv()
 
@@ -51,19 +51,12 @@ Id: {room.room_id}
 Число участников: {len(room.list_players)}/10"""
 
 
-def shuffle_list(arr: list):
-    for i in range(len(arr)):
-        j = randint(0, i)
-        arr[i], arr[j] = arr[j], arr[i]
-    return arr
-
-
 class NewRoomResponse(BaseResponse):
     async def call(self, ctx: Context) -> MessageInitTypes:
         name = ctx.last_request.text
-        room = add_room(name)
-        ctx.misc["room_info"] = room
-        return room_info_string(room) + "\n\nПрисоединиться?"
+        room_info = add_room(name)
+        ctx.misc["room_info"] = room_info
+        return room_info_string(room_info) + "\n\nПрисоединиться?"
 
 
 class JoinRoomResponse(BaseResponse):
@@ -164,7 +157,18 @@ class StartGameProcessing(BaseProcessing):
     """Implement game starting logic"""
 
     async def call(self, ctx: Context):
-        ...
+        room_info: RoomModel = ctx.misc["room_info"]
+        start_game(room_info.db_id)
+
+
+class StartGameResponse(BaseResponse):
+    async def call(self, ctx: Context) -> MessageInitTypes:
+        room_info: RoomModel = ctx.misc["room_info"]
+        user_info: UserModel = ctx.misc["user_info"]
+        player: PlayerModel = room_info.get_player(str(user_info.db_id))
+        return f"""Игра началась!
+Ваш номер: {player["number"]}
+Ваша роль: {player["role"]}"""
 
 
 with open("game_rules.json", encoding="utf8") as file:  # noqa: PTH123
@@ -321,7 +325,7 @@ greeting_script = {
     "in_game": {
         "start_node": {
             PRE_RESPONSE: {"init_game": StartGameProcessing()},
-            RESPONSE: "Игра началась",
+            RESPONSE: StartGameResponse(),
         },
     },
 }

@@ -1,4 +1,5 @@
 import random
+from random import randint
 from uuid import uuid4
 
 from bson.objectid import ObjectId
@@ -142,4 +143,25 @@ def exit_room(user_db_id: ObjectId, room_db_id: ObjectId):
     else:
         msg = "Something's wrong. User not found in the room"
         raise ValueError(msg)
+    rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": lst_players}})
+
+
+
+def shuffle_list(arr: list) -> list:
+    for i in range(len(arr)):
+        j = randint(0, i)
+        arr[i], arr[j] = arr[j], arr[i]
+    return arr
+
+
+def start_game(room_db_id: ObjectId):
+    room = rooms_collection.find_one({"_id": room_db_id})
+    lst_players : list = room["list_players"]
+    lst_players = shuffle_list(lst_players)
+    lst_role = ["комиссар", "мафия", "мафия", "дон", "мирный", "мирный", "мирный", "мирный", "мирный", "мирный"]
+    lst_role = shuffle_list(lst_role)
+    for i in range(len(lst_players)):
+        lst_players[i]["state"] = "alive"
+        lst_players[i]["role"] = lst_role[i]
+        lst_players[i]["number"] = i + 1
     rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": lst_players}})
