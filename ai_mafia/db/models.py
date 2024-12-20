@@ -36,6 +36,10 @@ class PlayerModel(BaseModel):
 
     number: int | None
 
+    ctx_id: int
+
+    chat_id: int
+
 
 RoomState = Literal["created", "started", "ended"]
 
@@ -67,12 +71,12 @@ class RoomModel(BaseModel):
             msg = "Something's wrong. Player not found"
             raise ValueError(msg)
 
-    def is_room_ready(self):
+    def is_room_ready(self, n_players_to_wait: int = 10):
         """
         Check whether there are 10 ready players in the room
         """
         ready_count = sum(player.state == "ready" for player in self.list_players)
-        return ready_count == 10  # noqa: PLR2004
+        return ready_count == n_players_to_wait
 
 
     def get_player(self, user_id: str):
