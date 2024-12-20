@@ -1,9 +1,10 @@
 import random
+from uuid import uuid4
 
 from bson.objectid import ObjectId
 from pymongo import MongoClient
 
-from .models import RoomModel, UserModel
+from .models import PlayerModel, RoomModel, UserModel
 from .setup import load_config
 
 config = load_config().db
@@ -66,9 +67,9 @@ def find_game_room(room_id: str) -> RoomModel | None:
     return RoomModel(**result)
 
 
-def add_game_room(name_room: str) -> RoomModel:
+def add_room(name_room: str) -> RoomModel:
     """Add new game room and store info in database, return created room"""
-    room = RoomModel(name=name_room)
+    room = RoomModel(name=name_room, room_id=str(uuid4().hex))
     result = rooms_collection.insert_one(room.model_dump())
     room.db_id = result.inserted_id
     return room
@@ -85,6 +86,60 @@ def get_random_room() -> RoomModel | None:
     room = random.choice(list_room)
     return RoomModel(**room)
 
-# def insert_game_room(game_id, game_name, users):
-#     game_room = {"game_id": game_id, "game_name": game_name, "users": users}
-#     game_rooms_collection.insert_one(game_room)
+
+def mark_user_as_ready(user_db_id: ObjectId, room_db_id: ObjectId) -> RoomModel:
+    """Mark user as ready and return updated room model"""
+    room = rooms_collection.find_one({"_id": room_db_id})
+    if room is None:
+        msg = "Something's wrong. Room not found"
+        raise RuntimeError(msg)
+    room_model = RoomModel(**room)
+    room_model.change_player_state(str(user_db_id), state="ready")
+    list_players_dict = [player.model_dump() for player in room_model.list_players]
+    rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": list_players_dict}})
+    return room_model
+
+
+def show_rooms():
+    for doc in rooms_collection.find():
+        print(doc)
+
+
+def is_room_ready(room_db_id: ObjectId):
+    """
+    Check whether there are 10 ready players in the room
+    """
+    # TODO async find_one
+    room = rooms_collection.find_one({"_id": room_db_id})
+    if room is None:
+        msg = "Something's wrong. Room not found"
+        raise RuntimeError(msg)
+    room_model = RoomModel(**room)
+    return room_model.is_room_ready()
+
+
+def join_room(user_db_id: ObjectId, room_db_id: ObjectId):
+    room = rooms_collection.find_one({"_id": room_db_id})
+    if room is None:
+        msg = "Something's wrong. Room not found"
+        raise RuntimeError(msg)
+    lst_players: list = room["list_players"]
+    lst_players.append(PlayerModel(user_id=str(user_db_id)).model_dump())
+    rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": lst_players}})
+
+
+def exit_room(user_db_id: ObjectId, room_db_id: ObjectId):
+    room = rooms_collection.find_one({"_id": room_db_id})
+    if room is None:
+        msg = "Something's wrong. Room not found"
+        raise RuntimeError(msg)
+    exit_id = str(user_db_id)
+    lst_players: list[PlayerModel] = room["list_players"]
+    for i in range(len(lst_players)):
+        if lst_players[i].user_id == exit_id:
+            lst_players.pop(i)
+            break
+    else:
+        msg = "Something's wrong. User not found in the room"
+        raise ValueError(msg)
+    rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": lst_players}})
