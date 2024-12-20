@@ -1,16 +1,24 @@
+import asyncio
+import os
+
 import requests
 import telegram as tg
 from chatsky import Message
 from chatsky.messengers.common.interface import CallbackMessengerInterface
+from dotenv import load_dotenv
 from fastapi import FastAPI
 
 from ai_mafia.config import load_config
+
+load_dotenv()
 
 config = load_config().chatsky
 
 interface = CallbackMessengerInterface()
 
 app = FastAPI()
+
+bot = tg.Bot(os.environ["TG_TOKEN"])
 
 
 @app.post("/chat", response_model=Message)
@@ -23,17 +31,15 @@ async def respond(
     return context.last_response
 
 
-@app.post("/room_is_ready", response_model=Message)
-async def room_is_ready(
-    ctx_id: str,
-):
+async def send_message(chat_id: int, txt: str):
+    await asyncio.sleep(1)
+    await bot.send_message(chat_id=chat_id, text=txt)
+
+
+def send_room_is_ready_signal(ctx_id: str, chat_id: int):
     msg = Message(text="_ready_")
-    context = await interface.on_request_async(msg, ctx_id)
-    return context.last_response
-
-
-def send_room_is_ready_signal(ctx_id: str):
-    requests.post(config.make_endpoint("room_is_ready"), params={"ctx_id": ctx_id}, timeout=5)
+    context = interface.on_request(msg, ctx_id)
+    asyncio.create_task(send_message(chat_id, context.last_response.text))  # noqa: RUF006
 
 
 @app.post("/skip", response_model=Message)

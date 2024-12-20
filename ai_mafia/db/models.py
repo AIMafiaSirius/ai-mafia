@@ -70,4 +70,4 @@ class RoomModel(BaseModel):
         Check whether there are 10 ready players in the room
         """
         ready_count = sum(player.state == "ready" for player in self.list_players)
-        return ready_count == 10  # noqa: PLR2004
+        return ready_count == 1
