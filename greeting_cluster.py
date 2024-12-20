@@ -24,6 +24,7 @@ from dotenv import load_dotenv
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from ai_mafia.config import load_config
+from ai_mafia.constants import N_PLAYERS
 from ai_mafia.db.models import RoomModel
 from ai_mafia.db.routines import (
     add_room,
@@ -159,8 +160,8 @@ class ExitRoomProcessing(BaseProcessing):
 class CheckReadyProcessing(ModifyResponse):
     async def modified_response(self, original_response: BaseResponse, ctx: Context):
         room = mark_user_as_ready(ctx.misc["user_info"].db_id, ctx.misc["room_info"].db_id)
-        if room.is_room_ready():
-            send_room_is_ready_signal(ctx.misc["room_info"].room_id)
+        if room.is_room_ready(N_PLAYERS):
+            send_room_is_ready_signal(room.room_id)
             return "Мы вас ждали!"
         return await original_response(ctx)
 

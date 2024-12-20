@@ -34,7 +34,7 @@ class PlayerModel(BaseModel):
 
     state: PlayerState = "not_ready"
 
-    number: int | None
+    number: int | None = None
 
     ctx_id: int
 
@@ -64,24 +64,23 @@ class RoomModel(BaseModel):
 
     def change_player_state(self, user_db_id: str, state: PlayerState):
         for player in self.list_players:
-            if player["user_id"] == user_db_id:
-                player["state"] = state
+            if player.user_id == user_db_id:
+                player.state = state
                 break
         else:
             msg = "Something's wrong. Player not found"
             raise ValueError(msg)
 
-    def is_room_ready(self, n_players_to_wait: int = 10):
+    def is_room_ready(self, n_players_to_wait: int):
         """
         Check whether there are 10 ready players in the room
         """
         ready_count = sum(player.state == "ready" for player in self.list_players)
         return ready_count == n_players_to_wait
 
-
     def get_player(self, user_id: str):
         for player in self.list_players:
-            if player["user_id"] == user_id:
+            if player.user_id == user_id:
                 return player
         msg = "Something's wrong. Player not found"
         raise ValueError(msg)

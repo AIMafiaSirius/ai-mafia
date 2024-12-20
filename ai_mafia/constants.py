@@ -1,0 +1,1 @@
+N_PLAYERS = 2

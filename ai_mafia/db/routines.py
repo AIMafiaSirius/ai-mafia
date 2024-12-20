@@ -146,7 +146,6 @@ def exit_room(user_db_id: ObjectId, room_db_id: ObjectId):
     rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": lst_players}})
 
 
-
 def shuffle_list(arr: list) -> list:
     for i in range(len(arr)):
         j = randint(0, i)
@@ -156,7 +155,7 @@ def shuffle_list(arr: list) -> list:
 
 def start_game(room_db_id: ObjectId):
     room = rooms_collection.find_one({"_id": room_db_id})
-    lst_players : list = room["list_players"]
+    lst_players: list = room["list_players"]
     lst_players = shuffle_list(lst_players)
     lst_role = ["комиссар", "мафия", "мафия", "дон", "мирный", "мирный", "мирный", "мирный", "мирный", "мирный"]
     lst_role = shuffle_list(lst_role)
