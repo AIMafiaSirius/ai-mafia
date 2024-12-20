@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 
 from ai_mafia.config import load_config
+from ai_mafia.db.routines import find_game_room
 
 load_dotenv()
 
@@ -37,8 +38,13 @@ async def send_message(ctx_id: str, chat_id: int):
     await bot.send_message(chat_id=chat_id, text=context.last_response.text)
 
 
-def send_room_is_ready_signal(ctx_id: str, chat_id: int):
-    asyncio.create_task(send_message(ctx_id, chat_id))  # noqa: RUF006
+def send_room_is_ready_signal(room_id: str):
+    room = find_game_room(room_id)
+    if room is None:
+        msg = "Room not found :("
+        raise ValueError(msg)
+    coroutines = [send_message(player.ctx_id, player.chat_id) for player in room.list_players]
+    [asyncio.create_task(coro) for coro in coroutines]
 
 
 @app.post("/skip", response_model=Message)

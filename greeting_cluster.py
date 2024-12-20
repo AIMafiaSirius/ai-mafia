@@ -142,7 +142,7 @@ class JoinRoomProcessing(BaseProcessing):
     async def call(self, ctx: Context):
         user_info: UserModel = ctx.misc["user_info"]
         room_info: RoomModel = ctx.misc["room_info"]
-        join_room(user_info.db_id, room_info.db_id)
+        join_room(user_info.db_id, room_info.db_id, ctx.id, ctx.misc["chat_id"])
 
 
 class ExitRoomProcessing(BaseProcessing):
@@ -159,7 +159,7 @@ class CheckReadyProcessing(ModifyResponse):
     async def modified_response(self, original_response: BaseResponse, ctx: Context):
         room = mark_user_as_ready(ctx.misc["user_info"].db_id, ctx.misc["room_info"].db_id)
         if room.is_room_ready():
-            send_room_is_ready_signal(ctx.id, ctx.misc["chat_id"])
+            send_room_is_ready_signal(ctx.misc["room_info"].room_id)
             return "Мы вас ждали!"
         return await original_response(ctx)
 
@@ -331,9 +331,6 @@ greeting_script = {
         "start_node": {
             PRE_RESPONSE: {"init_game": StartGameProcessing()},
             RESPONSE: "Игра началась",
-            TRANSITIONS: [
-                Tr(dst=dst.Previous(), cnd=cnd.ExactMatch("Назад"))
-            ]
         },
     },
 }

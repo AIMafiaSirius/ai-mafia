@@ -34,6 +34,10 @@ class PlayerModel(BaseModel):
 
     state: PlayerState = "not_ready"
 
+    ctx_id: int
+
+    chat_id: int
+
 
 RoomState = Literal["created", "started", "ended"]
 
