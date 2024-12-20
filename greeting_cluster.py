@@ -232,9 +232,7 @@ greeting_script = {
         },
     },
     "in_game": {
-        "start_node": {
-            RESPONSE: ""
-        },
+        "start_node": {RESPONSE: "Игра началась"},
     },
 }
 

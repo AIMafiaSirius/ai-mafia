@@ -91,7 +91,7 @@ def mark_user_as_ready(user_db_id: ObjectId, room_db_id: ObjectId) -> RoomModel:
     """Mark user as ready and return updated room model"""
     room = rooms_collection.find_one({"_id": room_db_id})
     if room is None:
-        msg = "Что-то пошло не так. Комната не найдена"
+        msg = "Something's wrong. Room not found"
         raise RuntimeError(msg)
     room_model = RoomModel(**room)
     room_model.change_player_state(str(user_db_id), state="ready")
@@ -104,6 +104,7 @@ def show_rooms():
     for doc in rooms_collection.find():
         print(doc)
 
+
 def is_room_ready(room_db_id: ObjectId):
     """
     Check whether there are 10 ready players in the room
@@ -111,7 +112,7 @@ def is_room_ready(room_db_id: ObjectId):
     # TODO async find_one
     room = rooms_collection.find_one({"_id": room_db_id})
     if room is None:
-        msg = "Что-то пошло не так. Комната не найдена"
+        msg = "Something's wrong. Room not found"
         raise RuntimeError(msg)
     room_model = RoomModel(**room)
     return room_model.is_room_ready()
@@ -120,7 +121,7 @@ def is_room_ready(room_db_id: ObjectId):
 def join_room(user_db_id: ObjectId, room_db_id: ObjectId):
     room = rooms_collection.find_one({"_id": room_db_id})
     if room is None:
-        msg = "Что-то пошло не так. Комната не найдена"
+        msg = "Something's wrong. Room not found"
         raise RuntimeError(msg)
     lst_players: list = room["list_players"]
     lst_players.append(PlayerModel(user_id=str(user_db_id)).model_dump())
@@ -130,7 +131,7 @@ def join_room(user_db_id: ObjectId, room_db_id: ObjectId):
 def exit_room(user_db_id: ObjectId, room_db_id: ObjectId):
     room = rooms_collection.find_one({"_id": room_db_id})
     if room is None:
-        msg = "Что-то пошло не так. Комната не найдена"
+        msg = "Something's wrong. Room not found"
         raise RuntimeError(msg)
     exit_id = str(user_db_id)
     lst_players: list[PlayerModel] = room["list_players"]
