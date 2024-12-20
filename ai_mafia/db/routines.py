@@ -118,13 +118,13 @@ def is_room_ready(room_db_id: ObjectId):
     return room_model.is_room_ready()
 
 
-def join_room(user_db_id: ObjectId, room_db_id: ObjectId):
+def join_room(user_db_id: ObjectId, room_db_id: ObjectId, ctx_id: str, chat_id: int):
     room = rooms_collection.find_one({"_id": room_db_id})
     if room is None:
         msg = "Something's wrong. Room not found"
         raise RuntimeError(msg)
     lst_players: list = room["list_players"]
-    lst_players.append(PlayerModel(user_id=str(user_db_id)).model_dump())
+    lst_players.append(PlayerModel(user_id=str(user_db_id), ctx_id=ctx_id, chat_id=chat_id).model_dump())
     rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": lst_players}})
 
 
@@ -134,9 +134,9 @@ def exit_room(user_db_id: ObjectId, room_db_id: ObjectId):
         msg = "Something's wrong. Room not found"
         raise RuntimeError(msg)
     exit_id = str(user_db_id)
-    lst_players: list[PlayerModel] = room["list_players"]
+    lst_players: list = room["list_players"]
     for i in range(len(lst_players)):
-        if lst_players[i].user_id == exit_id:
+        if lst_players[i]["user_id"] == exit_id:
             lst_players.pop(i)
             break
     else:
