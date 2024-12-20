@@ -17,7 +17,7 @@ from chatsky.core.message import (
 from telegram import Update
 
 
-def tg_update_to_chatsky_message(update: Update) -> Message:  # noqa: C901
+def tg_update_to_chatsky_message(update: Update) -> Message:  # noqa: C901, PLR0912
     """
     Convert Telegram update to Chatsky message.
     Extract text and supported attachments.
@@ -27,9 +27,13 @@ def tg_update_to_chatsky_message(update: Update) -> Message:  # noqa: C901
     """
 
     message = Message()
+    message.original_message = update.to_dict()
     message.attachments = []
 
     tg_msg = update.message
+    if tg_msg is None:
+        return message
+
     message.text = tg_msg.text or tg_msg.caption
     if tg_msg.location is not None:
         message.attachments += [Location(latitude=tg_msg.location.latitude, longitude=tg_msg.location.longitude)]
@@ -173,7 +177,5 @@ def tg_update_to_chatsky_message(update: Update) -> Message:  # noqa: C901
                 thumbnail=thumbnail,
             )
         ]
-
-    message.original_message = update.to_dict()
 
     return message

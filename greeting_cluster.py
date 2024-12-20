@@ -13,11 +13,13 @@ from chatsky import (
     BaseProcessing,
     BaseResponse,
     Context,
+    Message,
     MessageInitTypes,
     Pipeline,
 )
 from chatsky import Transition as Tr
 from dotenv import load_dotenv
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from ai_mafia.config import load_config
 from ai_mafia.db.models import RoomModel
@@ -94,6 +96,16 @@ class InitSessionProcessing(BaseProcessing):
         ctx.misc["user_info"] = user_info
 
 
+class CallbackCondition(BaseCondition):
+    query_string: str
+
+    async def call(self, ctx: Context):
+        upd: tg.Update = ctx.last_request.original_message
+        if upd.callback_query is None:
+            return False
+        return upd.callback_query.data == self.query_string
+
+
 class GreetingResponse(BaseResponse):
     """
     Greet and provide info about user
@@ -101,14 +113,16 @@ class GreetingResponse(BaseResponse):
 
     async def call(self, ctx: Context):
         user_info: UserModel = ctx.misc["user_info"]
-        return f"Привет, {user_info.tg_nickname}! Вам нужны правила игры?"
-
-
-class CheckReadyProcessing(BaseProcessing):
-    async def call(self, ctx: Context):
-        room = mark_user_as_ready(ctx.misc["user_info"].db_id, ctx.misc["room_info"].db_id)
-        if room.is_room_ready():
-            send_room_is_ready_signal(str(ctx.id))
+        text = f"Привет, {user_info.tg_nickname}! Вам нужна инструкция по игре?"
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("Да", callback_data="instr_yes"),
+                    InlineKeyboardButton("Нет", callback_data="instr_no"),
+                ]
+            ]
+        )
+        return Message(text=text, reply_markup=keyboard)
 
 
 class JoinRoomProcessing(BaseProcessing):
@@ -130,6 +144,13 @@ class ExitRoomProcessing(BaseProcessing):
             exit_room(user_info.db_id, room_info.db_id)
 
 
+class CheckReadyProcessing(BaseProcessing):
+    async def call(self, ctx: Context):
+        room = mark_user_as_ready(ctx.misc["user_info"].db_id, ctx.misc["room_info"].db_id)
+        if room.is_room_ready():
+            send_room_is_ready_signal(str(ctx.id))
+
+
 with open("game_rules.json") as file:  # noqa: PTH123
     game_rules_data = json.load(file)
 
@@ -149,8 +170,8 @@ greeting_script = {
         "greeting_node": {
             RESPONSE: GreetingResponse(),
             TRANSITIONS: [
-                Tr(dst=("get_rules"), cnd=cnd.ExactMatch("Да")),
-                Tr(dst=("to_room_flow", "choose"), cnd=cnd.ExactMatch("Нет")),
+                Tr(dst=("get_rules"), cnd=CallbackCondition(query_string="instr_yes")),
+                Tr(dst=("to_room_flow", "choose"), cnd=CallbackCondition(query_string="instr_no")),
             ],
         },
         "get_rules": {
@@ -171,38 +192,38 @@ greeting_script = {
             RESPONSE: game_rules_data["full_rules"],
             TRANSITIONS: [
                 Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
-            ]
+            ],
         },
         "game_roles": {
             RESPONSE: game_rules_data["roles"],
             TRANSITIONS: [
                 Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
-            ]
+            ],
         },
         "day_phase": {
             RESPONSE: game_rules_data["game_phase"]["day"],
             TRANSITIONS: [
                 Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
-            ]
+            ],
         },
         "voting_phase": {
             RESPONSE: game_rules_data["game_phase"]["voting"],
             TRANSITIONS: [
                 Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
-            ]
+            ],
         },
         "night_phase": {
             RESPONSE: game_rules_data["game_phase"]["night"],
             TRANSITIONS: [
                 Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
-            ]
+            ],
         },
         "start_and_end": {
             RESPONSE: game_rules_data["game_phase"]["game_start_and_end"],
             TRANSITIONS: [
                 Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
-            ]
-        }
+            ],
+        },
     },
     "to_room_flow": {
         "choose": {
