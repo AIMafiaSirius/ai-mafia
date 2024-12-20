@@ -56,13 +56,13 @@ class RoomModel(BaseModel):
     list_players: list[PlayerModel] = []
     """List of user's tg id in the game room"""
 
-    def change_player_state(self, user_db_id: ObjectId, state: PlayerState):
+    def change_player_state(self, user_db_id: str, state: PlayerState):
         for player in self.list_players:
-            if player.user_id == str(user_db_id):
+            if player.user_id == user_db_id:
                 player.state = state
                 break
         else:
-            msg = "Что-то пошло не так. Игрок не найден"
+            msg = "Something's wrong. Player not found"
             raise ValueError(msg)
 
     def is_room_ready(self):

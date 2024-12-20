@@ -40,7 +40,7 @@ def send_room_is_ready_signal(ctx_id: str):
 async def skip(
     ctx_id: str,
 ):
-    msg = Message(text="\n")
+    msg = Message(text="_skip_")
     context = await interface.on_request_async(msg, ctx_id)
     return context.last_response
 

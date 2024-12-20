@@ -87,13 +87,17 @@ def get_random_room() -> RoomModel | None:
     return RoomModel(**room)
 
 
-def mark_user_as_ready(user_db_id: ObjectId, room_db_id: ObjectId):
+def mark_user_as_ready(user_db_id: ObjectId, room_db_id: ObjectId) -> RoomModel:
+    """Mark user as ready and return updated room model"""
     room = rooms_collection.find_one({"_id": room_db_id})
     if room is None:
-        msg = "Что-то пошло не так. Комната не найдена"
+        msg = "Something's wrong. Room not found"
         raise RuntimeError(msg)
     room_model = RoomModel(**room)
-    room_model.change_player_state(user_db_id, state="ready")
+    room_model.change_player_state(str(user_db_id), state="ready")
+    list_players_dict = [player.model_dump() for player in room_model.list_players]
+    rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": list_players_dict}})
+    return room_model
 
 
 def show_rooms():
@@ -108,7 +112,7 @@ def is_room_ready(room_db_id: ObjectId):
     # TODO async find_one
     room = rooms_collection.find_one({"_id": room_db_id})
     if room is None:
-        msg = "Что-то пошло не так. Комната не найдена"
+        msg = "Something's wrong. Room not found"
         raise RuntimeError(msg)
     room_model = RoomModel(**room)
     return room_model.is_room_ready()
@@ -117,7 +121,7 @@ def is_room_ready(room_db_id: ObjectId):
 def join_room(user_db_id: ObjectId, room_db_id: ObjectId):
     room = rooms_collection.find_one({"_id": room_db_id})
     if room is None:
-        msg = "Что-то пошло не так. Комната не найдена"
+        msg = "Something's wrong. Room not found"
         raise RuntimeError(msg)
     lst_players: list = room["list_players"]
     lst_players.append(PlayerModel(user_id=str(user_db_id)).model_dump())
@@ -127,12 +131,15 @@ def join_room(user_db_id: ObjectId, room_db_id: ObjectId):
 def exit_room(user_db_id: ObjectId, room_db_id: ObjectId):
     room = rooms_collection.find_one({"_id": room_db_id})
     if room is None:
-        msg = "Что-то пошло не так. Комната не найдена"
+        msg = "Something's wrong. Room not found"
         raise RuntimeError(msg)
     exit_id = str(user_db_id)
-    lst_players: list = room["list_players"]
+    lst_players: list[PlayerModel] = room["list_players"]
     for i in range(len(lst_players)):
         if lst_players[i].user_id == exit_id:
             lst_players.pop(i)
             break
+    else:
+        msg = "Something's wrong. User not found in the room"
+        raise ValueError(msg)
     rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": lst_players}})
