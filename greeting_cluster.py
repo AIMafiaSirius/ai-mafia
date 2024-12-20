@@ -124,6 +124,44 @@ class GreetingResponse(BaseResponse):
         )
         return Message(text=text, reply_markup=keyboard)
 
+class ShowRulesResponse(BaseResponse):
+    async def call(self, _: Context):
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("Полные правила", callback_data="full_rules"),
+                ],
+                [
+                    InlineKeyboardButton("Роли", callback_data="game_roles"),
+                ],
+                [
+                    InlineKeyboardButton("Ход дня", callback_data="day_phase"),
+                    InlineKeyboardButton("Ход голосования", callback_data="voting_phase"),
+                    InlineKeyboardButton("Ход ночи", callback_data="night_phase"),
+                ],
+                [
+                    InlineKeyboardButton("Начало и конец игры", callback_data="start_and_end")
+                ],
+                [
+                    InlineKeyboardButton("Назад", callback_data="step_backward"),
+                ]
+            ]
+        )
+        return Message(text="Выберите раздел правил, который хотите увидеть", reply_markup=keyboard)
+
+
+class RuleResponse(BaseResponse):
+    name: str
+
+    async def call(self, _: Context):
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("Назад", callback_data="step_backward")
+                ]
+            ]
+        )
+        return Message(text=game_rules_data[self.name], reply_markup=keyboard)
 
 class JoinRoomProcessing(BaseProcessing):
     """Implement room joining logic"""
@@ -175,51 +213,51 @@ greeting_script = {
             ],
         },
         "get_rules": {
-            RESPONSE: "Вам нужны полные правила или какой-то определённый раздел?",
+            RESPONSE: ShowRulesResponse(),
             TRANSITIONS: [
-                Tr(dst=("to_room_flow", "choose"), cnd=cnd.ExactMatch("Назад")),
-                Tr(dst=("rules_flow", "game_rules"), cnd=cnd.ExactMatch("Полные")),
-                Tr(dst=("rules_flow", "game_roles"), cnd=cnd.ExactMatch("Роли")),
-                Tr(dst=("rules_flow", "day_phase"), cnd=cnd.ExactMatch("День")),
-                Tr(dst=("rules_flow", "voting_phase"), cnd=cnd.ExactMatch("Голосование")),
-                Tr(dst=("rules_flow", "night_phase"), cnd=cnd.ExactMatch("Ночь")),
-                Tr(dst=("rules_flow", "start_and_end"), cnd=cnd.ExactMatch("Начало и конец игры")),
+                Tr(dst=("to_room_flow", "choose"), cnd=CallbackCondition(query_string="step_backward")),
+                Tr(dst=("rules_flow", "game_rules"), cnd=CallbackCondition(query_string="full_rules")),
+                Tr(dst=("rules_flow", "game_roles"), cnd=CallbackCondition(query_string="roles")),
+                Tr(dst=("rules_flow", "day_phase"), cnd=CallbackCondition(query_string="day_phase")),
+                Tr(dst=("rules_flow", "voting_phase"), cnd=CallbackCondition(query_string="voting_phase")),
+                Tr(dst=("rules_flow", "night_phase"), cnd=CallbackCondition(query_string="night_phase")),
+                Tr(dst=("rules_flow", "start_and_end"), cnd=CallbackCondition(query_string="start_and_end")),
             ],
         },
     },
     "rules_flow": {
         "game_rules": {
-            RESPONSE: game_rules_data["full_rules"],
+            RESPONSE: RuleResponse("full_rules"),
             TRANSITIONS: [
                 Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
             ],
         },
         "game_roles": {
-            RESPONSE: game_rules_data["roles"],
+            RESPONSE: RuleResponse["roles"],
             TRANSITIONS: [
                 Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
             ],
         },
         "day_phase": {
-            RESPONSE: game_rules_data["game_phase"]["day"],
+            RESPONSE: RuleResponse["game_phase"]["day"],
             TRANSITIONS: [
                 Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
             ],
         },
         "voting_phase": {
-            RESPONSE: game_rules_data["game_phase"]["voting"],
+            RESPONSE: RuleResponse["game_phase"]["voting"],
             TRANSITIONS: [
                 Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
             ],
         },
         "night_phase": {
-            RESPONSE: game_rules_data["game_phase"]["night"],
+            RESPONSE: RuleResponse["game_phase"]["night"],
             TRANSITIONS: [
                 Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
             ],
         },
         "start_and_end": {
-            RESPONSE: game_rules_data["game_phase"]["game_start_and_end"],
+            RESPONSE: RuleResponse["game_phase"]["game_start_and_end"],
             TRANSITIONS: [
                 Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
             ],
