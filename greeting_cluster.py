@@ -12,11 +12,13 @@ from chatsky import (
     BaseProcessing,
     BaseResponse,
     Context,
+    Message,
     MessageInitTypes,
     Pipeline,
 )
 from chatsky import Transition as Tr
 from dotenv import load_dotenv
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from ai_mafia.config import load_config
 from ai_mafia.db.models import RoomModel
@@ -85,6 +87,16 @@ class InitSessionProcessing(BaseProcessing):
         ctx.misc["user_info"] = user_info
 
 
+class CallbackCondition(BaseCondition):
+    query_string: str
+
+    async def call(self, ctx: Context):
+        upd: tg.Update = ctx.last_request.original_message
+        if upd.callback_query is None:
+            return False
+        return upd.callback_query.data == self.query_string
+
+
 class GreetingResponse(BaseResponse):
     """
     Greet and provide info about user
@@ -92,7 +104,16 @@ class GreetingResponse(BaseResponse):
 
     async def call(self, ctx: Context):
         user_info: UserModel = ctx.misc["user_info"]
-        return f"Привет, {user_info.tg_nickname}! Вам нужна инструкция по игре?"
+        text = f"Привет, {user_info.tg_nickname}! Вам нужна инструкция по игре?"
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("Да", callback_data="instr_yes"),
+                    InlineKeyboardButton("Нет", callback_data="instr_no"),
+                ]
+            ]
+        )
+        return Message(text=text, reply_markup=keyboard)
 
 
 class CallSynchronizerProcessing(BaseProcessing):
@@ -137,8 +158,8 @@ greeting_script = {
         "greeting_node": {
             RESPONSE: GreetingResponse(),
             TRANSITIONS: [
-                Tr(dst=("instruction"), cnd=cnd.ExactMatch("Да")),
-                Tr(dst=("to_room_flow", "choose"), cnd=cnd.ExactMatch("Нет")),
+                Tr(dst=("instruction"), cnd=CallbackCondition(query_string="instr_yes")),
+                Tr(dst=("to_room_flow", "choose"), cnd=CallbackCondition(query_string="instr_no")),
             ],
         },
         "instruction": {
