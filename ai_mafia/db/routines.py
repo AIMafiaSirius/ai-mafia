@@ -87,13 +87,16 @@ def get_random_room() -> RoomModel | None:
     return RoomModel(**room)
 
 
-def mark_user_as_ready(user_db_id: ObjectId, room_db_id: ObjectId):
+def mark_user_as_ready(user_db_id: ObjectId, room_db_id: ObjectId) -> RoomModel:
+    """Mark user as ready and return updated room model"""
     room = rooms_collection.find_one({"_id": room_db_id})
     if room is None:
         msg = "Что-то пошло не так. Комната не найдена"
         raise RuntimeError(msg)
     room_model = RoomModel(**room)
     room_model.change_player_state(user_db_id, state="ready")
+    rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": room_model.list_player}})
+    return room_model
 
 
 def show_rooms():
@@ -129,7 +132,7 @@ def exit_room(user_db_id: ObjectId, room_db_id: ObjectId):
         msg = "Что-то пошло не так. Комната не найдена"
         raise RuntimeError(msg)
     exit_id = str(user_db_id)
-    lst_players: list = room["list_players"]
+    lst_players: list[PlayerModel] = room["list_players"]
     for i in range(len(lst_players)):
         if lst_players[i].user_id == exit_id:
             lst_players.pop(i)

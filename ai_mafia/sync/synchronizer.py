@@ -20,7 +20,7 @@ async def player_is_ready(user_db_id: str, room_db_id: str, ctx_id: str) -> None
 
 def send_ready_signal(user_db_id: ObjectId, room_db_id: ObjectId, ctx_id):
     requests.post(
-        url=config.make_endpoint("user_is_ready"),
+        url=config.make_endpoint("player_is_ready"),
         params={
             "user_db_id": str(user_db_id),
             "room_db_id": str(room_db_id),

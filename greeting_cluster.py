@@ -20,9 +20,17 @@ from dotenv import load_dotenv
 
 from ai_mafia.config import load_config
 from ai_mafia.db.models import RoomModel
-from ai_mafia.db.routines import add_room, add_user, exit_room, find_game_room, find_user, get_random_room, join_room
-from ai_mafia.sync import send_ready_signal
-from ai_mafia.tg_proxy import chatsky_web_api, chatsky_web_interface
+from ai_mafia.db.routines import (
+    add_room,
+    add_user,
+    exit_room,
+    find_game_room,
+    find_user,
+    get_random_room,
+    join_room,
+    mark_user_as_ready,
+)
+from ai_mafia.tg_proxy import chatsky_web_api, chatsky_web_interface, send_room_is_ready_signal
 
 if TYPE_CHECKING:
     import telegram as tg
@@ -95,11 +103,11 @@ class GreetingResponse(BaseResponse):
         return f"Привет, {user_info.tg_nickname}! Вам нужна инструкция по игре?"
 
 
-class CallSynchronizerProcessing(BaseProcessing):
+class CheckReadyProcessing(BaseProcessing):
     async def call(self, ctx: Context):
-        user_info: UserModel = ctx.misc["user_info"]
-        room_info: RoomModel = ctx.misc["room_info"]
-        send_ready_signal(user_info.db_id, room_info.db_id, ctx.id)
+        room = mark_user_as_ready(ctx.misc["room_info"].db_id)
+        if room.is_room_ready():
+            send_room_is_ready_signal(ctx.id)
 
 
 class JoinRoomProcessing(BaseProcessing):
@@ -181,6 +189,7 @@ greeting_script = {
                     dst="room_not_found",
                     cnd=cnd.All(cnd.Not(cnd.ExactMatch("К случайной")), cnd.Not(RoomExistCondition())),
                 ),
+                Tr(dst="choose", cnd=cnd.ExactMatch("Назад")),
             ],
         },
         "random_not_found": {
@@ -213,7 +222,7 @@ greeting_script = {
             ],
         },
         "waiting": {
-            PRE_RESPONSE: {"call_syncronizer": CallSynchronizerProcessing()},
+            PRE_RESPONSE: {"call_syncronizer": CheckReadyProcessing()},
             RESPONSE: "Пожалуйста, ожидайте начало игры",
             PRE_TRANSITION: {"exit_room": ExitRoomProcessing()},
             TRANSITIONS: [
@@ -222,8 +231,12 @@ greeting_script = {
             ],
         },
     },
+    "in_game": {
+        "start_node": {
+            RESPONSE: ""
+        },
+    },
 }
-
 
 pipeline = Pipeline(
     greeting_script,
