@@ -1,5 +1,4 @@
 from typing import Literal
-from uuid import uuid4
 
 from bson.objectid import ObjectId
 from pydantic import BaseModel, ConfigDict, Field
@@ -46,7 +45,7 @@ class RoomModel(BaseModel):
 
     db_id: ObjectId | None = Field(default=None, alias="_id", description="Unique identifier in mongo db")
 
-    room_id: str = str(int(uuid4()))
+    room_id: str
     """Usable room's id for users"""
 
     name: str
@@ -54,12 +53,12 @@ class RoomModel(BaseModel):
 
     room_state: RoomState = "created"
 
-    list_users: list[PlayerModel] = []
+    list_players: list[PlayerModel] = []
     """List of user's tg id in the game room"""
 
-    def change_player_state(self, user_db_id: ObjectId, state: PlayerState):
-        for player in self.list_users:
-            if player.user_id == str(user_db_id):
+    def change_player_state(self, user_db_id: str, state: PlayerState):
+        for player in self.list_players:
+            if player.user_id == user_db_id:
                 player.state = state
                 break
         else:
@@ -68,7 +67,7 @@ class RoomModel(BaseModel):
 
     def is_room_ready(self):
         """
-        check whether there are 10 ready players in the room
+        Check whether there are 10 ready players in the room
         """
-        ready_count = sum(player.state == "ready" for player in self.list_users)
+        ready_count = sum(player.state == "ready" for player in self.list_players)
         return ready_count == 10  # noqa: PLR2004

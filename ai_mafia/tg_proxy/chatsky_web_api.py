@@ -34,3 +34,16 @@ async def room_is_ready(
 
 def send_room_is_ready_signal(ctx_id: str):
     requests.post(config.make_endpoint("room_is_ready"), params={"ctx_id": ctx_id}, timeout=5)
+
+
+@app.post("/skip", response_model=Message)
+async def skip(
+    ctx_id: str,
+):
+    msg = Message(text="_skip_")
+    context = await interface.on_request_async(msg, ctx_id)
+    return context.last_response
+
+
+def send_skip_signal(ctx_id: str):
+    requests.post(config.make_endpoint("skip"), params={"ctx_id": ctx_id}, timeout=5)

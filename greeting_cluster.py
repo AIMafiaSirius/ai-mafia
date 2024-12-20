@@ -21,9 +21,17 @@ from dotenv import load_dotenv
 
 from ai_mafia.config import load_config
 from ai_mafia.db.models import RoomModel
-from ai_mafia.db.routines import add_game_room, add_user, find_game_room, find_user, get_random_room, join_room
-from ai_mafia.sync import send_ready_signal
-from ai_mafia.tg_proxy import chatsky_web_api, chatsky_web_interface
+from ai_mafia.db.routines import (
+    add_room,
+    add_user,
+    exit_room,
+    find_game_room,
+    find_user,
+    get_random_room,
+    join_room,
+    mark_user_as_ready,
+)
+from ai_mafia.tg_proxy import chatsky_web_api, chatsky_web_interface, send_room_is_ready_signal
 
 if TYPE_CHECKING:
     import telegram as tg
@@ -37,17 +45,17 @@ def room_info_string(room: RoomModel):
     return f"""Данные по комнате:
 Id: {room.room_id}
 Название: {room.name}
-Число участников: {len(room.list_users)}/10"""
+Число участников: {len(room.list_players)}/10"""
 
 
 class NewRoomResponse(BaseResponse):
     async def call(self, ctx: Context) -> MessageInitTypes:
-        name = str(ctx.last_request.text)
-        room = add_game_room(name)
-        return room_info_string(room)
+        name = ctx.last_request.text
+        room = add_room(name)
+        return room_info_string(room) + "\n\nПрисоединиться?"
 
 
-class JoinRandomRoomResponse(BaseResponse):
+class JoinRoomResponse(BaseResponse):
     async def call(self, ctx: Context) -> MessageInitTypes:
         room: RoomModel = ctx.misc["room_info"]
         return room_info_string(room) + "\n\nПрисоединиться?"
@@ -96,11 +104,11 @@ class GreetingResponse(BaseResponse):
         return f"Привет, {user_info.tg_nickname}! Вам нужны правила игры?"
 
 
-class CallSynchronizerProcessing(BaseProcessing):
+class CheckReadyProcessing(BaseProcessing):
     async def call(self, ctx: Context):
-        user_info: UserModel = ctx.misc["user_info"]
-        room_info: RoomModel = ctx.misc["room_info"]
-        send_ready_signal(user_info.db_id, room_info.db_id, ctx.id)
+        room = mark_user_as_ready(ctx.misc["user_info"].db_id, ctx.misc["room_info"].db_id)
+        if room.is_room_ready():
+            send_room_is_ready_signal(str(ctx.id))
 
 
 class JoinRoomProcessing(BaseProcessing):
@@ -112,6 +120,16 @@ class JoinRoomProcessing(BaseProcessing):
         join_room(user_info.db_id, room_info.db_id)
 
 
+class ExitRoomProcessing(BaseProcessing):
+    """Implement room exiting logic"""
+
+    async def call(self, ctx: Context):
+        if ctx.last_request.text == "Выйти":
+            user_info: UserModel = ctx.misc["user_info"]
+            room_info: RoomModel = ctx.misc["room_info"]
+            exit_room(user_info.db_id, room_info.db_id)
+
+
 with open("game_rules.json") as file:  # noqa: PTH123
     game_rules_data = json.load(file)
 
@@ -119,7 +137,7 @@ greeting_script = {
     "global_flow": {
         "start_node": {},
         "fallback_node": {
-            RESPONSE: "К сожалению я не могу обработать такую команду, введите другую",
+            RESPONSE: "К сожалению, я не могу обработать такую команду, введите другую",
             TRANSITIONS: [Tr(dst=dst.Previous())],
         },
     },
@@ -208,57 +226,65 @@ greeting_script = {
         "enter_id": {
             RESPONSE: "Введите ID комнаты или присоединитесь к случайной",
             TRANSITIONS: [
-                Tr(dst=("random_id"), cnd=cnd.All(cnd.ExactMatch("К случайной"), RandomRoomExistCondition())),
+                Tr(dst=("join_id"), cnd=cnd.All(cnd.ExactMatch("К случайной"), RandomRoomExistCondition())),
                 Tr(
                     dst=("random_not_found"),
                     cnd=cnd.All(cnd.ExactMatch("К случайной"), cnd.Not(RandomRoomExistCondition())),
                 ),
                 Tr(
-                    dst=("in_room_flow", "not_ready"),
+                    dst=("join_id"),
                     cnd=cnd.All(cnd.Not(cnd.ExactMatch("К случайной")), RoomExistCondition()),
                 ),
                 Tr(
                     dst="room_not_found",
                     cnd=cnd.All(cnd.Not(cnd.ExactMatch("К случайной")), cnd.Not(RoomExistCondition())),
                 ),
+                Tr(dst="choose", cnd=cnd.ExactMatch("Назад")),
             ],
         },
         "random_not_found": {
-            RESPONSE: "Нет открытых комнат. Создать новую?",
+            RESPONSE: "Сейчас нет открытых комнат. Создать новую?",
             TRANSITIONS: [
                 Tr(dst="make", cnd=cnd.ExactMatch("Да")),
                 Tr(dst="enter_id", cnd=cnd.ExactMatch("Назад")),
             ],
         },
-        "random_id": {
-            RESPONSE: JoinRandomRoomResponse(),
+        "join_id": {
+            RESPONSE: JoinRoomResponse(),
             TRANSITIONS: [
                 Tr(dst="choose", cnd=cnd.ExactMatch("Назад")),
                 Tr(dst=("in_room_flow", "not_ready"), cnd=cnd.ExactMatch("Да")),
             ],
         },
-        "room_not_found": {RESPONSE: "комната с таким ID не найдена"},
+        "room_not_found": {
+            RESPONSE: "Комната с таким ID не найдена",
+            TRANSITIONS: [Tr(dst=("enter_id"))],
+        },
     },
     "in_room_flow": {
         "not_ready": {
             PRE_RESPONSE: {"join_room": JoinRoomProcessing()},
             RESPONSE: "Вы присоединились к комнате. Введите 'Готов', если готовы начать",
+            PRE_TRANSITION: {"exit_room": ExitRoomProcessing()},
             TRANSITIONS: [
                 Tr(dst=("waiting"), cnd=cnd.ExactMatch("Готов")),
                 Tr(dst=("to_room_flow", "choose"), cnd=cnd.ExactMatch("Выйти")),
             ],
         },
         "waiting": {
-            PRE_RESPONSE: {"call_syncronizer": CallSynchronizerProcessing()},
+            PRE_RESPONSE: {"call_syncronizer": CheckReadyProcessing()},
             RESPONSE: "Пожалуйста, ожидайте начало игры",
+            PRE_TRANSITION: {"exit_room": ExitRoomProcessing()},
             TRANSITIONS: [
                 Tr(dst=("to_room_flow", "choose"), cnd=cnd.ExactMatch("Выйти")),
                 Tr(dst=("in_game", "start_node"), cnd=cnd.ExactMatch("_ready_")),
             ],
         },
     },
+    "in_game": {
+        "start_node": {RESPONSE: "Игра началась"},
+    },
 }
-
 
 pipeline = Pipeline(
     greeting_script,
