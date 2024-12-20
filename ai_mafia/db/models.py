@@ -62,7 +62,7 @@ class RoomModel(BaseModel):
                 player.state = state
                 break
         else:
-            msg = "Что-то пошло не так. Игрок не найден"
+            msg = "Something's wrong. Player not found"
             raise ValueError(msg)
 
     def is_room_ready(self):
