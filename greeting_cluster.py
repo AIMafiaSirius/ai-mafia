@@ -205,7 +205,8 @@ class ExitRoomProcessing(BaseProcessing):
     """Implement room exiting logic"""
 
     async def call(self, ctx: Context):
-        if ctx.last_request.text == "Выйти":
+        upd: tg.Update = ctx.last_request.original_message
+        if upd.callback_query.data == "leave":
             user_info: UserModel = ctx.misc["user_info"]
             room_info: RoomModel = ctx.misc["room_info"]
             exit_room(user_info.db_id, room_info.db_id)
