@@ -125,13 +125,6 @@ class GreetingResponse(BaseResponse):
         return Message(text=text, reply_markup=keyboard)
 
 
-class CallSynchronizerProcessing(BaseProcessing):
-    async def call(self, ctx: Context):
-        user_info: UserModel = ctx.misc["user_info"]
-        room_info: RoomModel = ctx.misc["room_info"]
-        send_ready_signal(user_info.db_id, room_info.db_id, ctx.id)
-
-
 class JoinRoomProcessing(BaseProcessing):
     """Implement room joining logic"""
 
@@ -156,25 +149,6 @@ class CheckReadyProcessing(BaseProcessing):
         room = mark_user_as_ready(ctx.misc["user_info"].db_id, ctx.misc["room_info"].db_id)
         if room.is_room_ready():
             send_room_is_ready_signal(str(ctx.id))
-
-
-class JoinRoomProcessing(BaseProcessing):
-    """Implement room joining logic"""
-
-    async def call(self, ctx: Context):
-        user_info: UserModel = ctx.misc["user_info"]
-        room_info: RoomModel = ctx.misc["room_info"]
-        join_room(user_info.db_id, room_info.db_id)
-
-
-class ExitRoomProcessing(BaseProcessing):
-    """Implement room exiting logic"""
-
-    async def call(self, ctx: Context):
-        if ctx.last_request.text == "Выйти":
-            user_info: UserModel = ctx.misc["user_info"]
-            room_info: RoomModel = ctx.misc["room_info"]
-            exit_room(user_info.db_id, room_info.db_id)
 
 
 with open("game_rules.json") as file:  # noqa: PTH123
@@ -218,38 +192,38 @@ greeting_script = {
             RESPONSE: game_rules_data["full_rules"],
             TRANSITIONS: [
                 Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
-            ]
+            ],
         },
         "game_roles": {
             RESPONSE: game_rules_data["roles"],
             TRANSITIONS: [
                 Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
-            ]
+            ],
         },
         "day_phase": {
             RESPONSE: game_rules_data["game_phase"]["day"],
             TRANSITIONS: [
                 Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
-            ]
+            ],
         },
         "voting_phase": {
             RESPONSE: game_rules_data["game_phase"]["voting"],
             TRANSITIONS: [
                 Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
-            ]
+            ],
         },
         "night_phase": {
             RESPONSE: game_rules_data["game_phase"]["night"],
             TRANSITIONS: [
                 Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
-            ]
+            ],
         },
         "start_and_end": {
             RESPONSE: game_rules_data["game_phase"]["game_start_and_end"],
             TRANSITIONS: [
                 Tr(dst=("greeting_flow", "get_rules"), cnd=cnd.ExactMatch("Назад")),
-            ]
-        }
+            ],
+        },
     },
     "to_room_flow": {
         "choose": {
