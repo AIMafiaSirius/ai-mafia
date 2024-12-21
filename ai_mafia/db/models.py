@@ -28,6 +28,7 @@ PlayerState = Literal["not_ready", "ready", "alive", "dead"]
 
 
 class PlayerModel(BaseModel):
+
     user_id: str | None
 
     role: str | None = None
@@ -78,9 +79,17 @@ class RoomModel(BaseModel):
         ready_count = sum(player.state == "ready" for player in self.list_players)
         return ready_count == n_players_to_wait
 
-    def get_player(self, user_id: str):
+    def get_player(self, user_db_id: str) -> PlayerModel:
         for player in self.list_players:
-            if player.user_id == user_id:
+            if player.user_id == user_db_id:
                 return player
         msg = "Something's wrong. Player not found"
         raise ValueError(msg)
+
+
+    def get_cnt_black(self):
+        cnt = 0
+        for player in self.list_players:
+            if player.state == "alive" and player.role in ("мафия", "дон"):
+                cnt += 1
+        return cnt

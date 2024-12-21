@@ -1,5 +1,4 @@
 import json
-from random import randint
 from typing import TYPE_CHECKING
 
 import chatsky.conditions as cnd
@@ -54,11 +53,39 @@ Id: {room.room_id}
 Число участников: {len(room.list_players)}/10"""
 
 
-def shuffle_list(arr: list):
-    for i in range(len(arr)):
-        j = randint(0, i)
-        arr[i], arr[j] = arr[j], arr[i]
-    return arr
+class InitSessionProcessing(BaseProcessing):
+    """
+    Add user tg id to database.
+    """
+
+    async def call(self, ctx: Context):
+        tg_info: tg.Update = ctx.last_request.original_message
+        tg_id = tg_info.effective_user.id
+        user_nickname = tg_info.effective_user.name
+        user_info = find_user(tg_id)
+        if user_info is None:
+            user_info = add_user(tg_id, user_nickname)
+        ctx.misc["user_info"] = user_info
+        ctx.misc["chat_id"] = tg_info.effective_chat.id
+
+
+class GreetingResponse(BaseResponse):
+    """
+    Greet and provide info about user
+    """
+
+    async def call(self, ctx: Context) -> MessageInitTypes:
+        user_info: UserModel = ctx.misc["user_info"]
+        text = f"Привет, {user_info.tg_nickname}! Вам нужна инструкция по игре?"
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("Да", callback_data="instr_yes"),
+                    InlineKeyboardButton("Нет", callback_data="instr_no"),
+                ]
+            ]
+        )
+        return Message(text=text, reply_markup=keyboard)
 
 
 class NewRoomResponse(BaseResponse):
@@ -93,22 +120,6 @@ class RoomExistCondition(BaseCondition):
         return False
 
 
-class InitSessionProcessing(BaseProcessing):
-    """
-    Add user tg id to database.
-    """
-
-    async def call(self, ctx: Context):
-        tg_info: tg.Update = ctx.last_request.original_message
-        tg_id = tg_info.effective_user.id
-        user_nickname = tg_info.effective_user.name
-        user_info = find_user(tg_id)
-        if user_info is None:
-            user_info = add_user(tg_id, user_nickname)
-        ctx.misc["user_info"] = user_info
-        ctx.misc["chat_id"] = tg_info.effective_chat.id
-
-
 class CallbackCondition(BaseCondition):
     query_string: str
 
@@ -117,25 +128,6 @@ class CallbackCondition(BaseCondition):
         if upd.callback_query is None:
             return False
         return upd.callback_query.data == self.query_string
-
-
-class GreetingResponse(BaseResponse):
-    """
-    Greet and provide info about user
-    """
-
-    async def call(self, ctx: Context):
-        user_info: UserModel = ctx.misc["user_info"]
-        text = f"Привет, {user_info.tg_nickname}! Вам нужна инструкция по игре?"
-        keyboard = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("Да", callback_data="instr_yes"),
-                    InlineKeyboardButton("Нет", callback_data="instr_no"),
-                ]
-            ]
-        )
-        return Message(text=text, reply_markup=keyboard)
 
 
 class JoinRoomProcessing(BaseProcessing):
@@ -159,7 +151,9 @@ class ExitRoomProcessing(BaseProcessing):
 
 class CheckReadyProcessing(ModifyResponse):
     async def modified_response(self, original_response: BaseResponse, ctx: Context):
-        room = mark_user_as_ready(ctx.misc["user_info"].db_id, ctx.misc["room_info"].db_id)
+        user_info: UserModel = ctx.misc["user_info"]
+        room_info: RoomModel = ctx.misc["room_info"]
+        room = mark_user_as_ready(user_info.db_id, room_info.db_id)
         if room.is_room_ready(N_PLAYERS):
             send_room_is_ready_signal(room.room_id)
             return "Мы вас ждали!"
@@ -169,18 +163,23 @@ class CheckReadyProcessing(ModifyResponse):
 class StartGameProcessing(BaseProcessing):
     """Implement game starting logic"""
 
-    async def call(self, ctx: Context): ...
+    async def call(self, ctx: Context):
+        room_info: RoomModel = ctx.misc["room_info"]
+        user_info: UserModel = ctx.misc["user_info"]
+        room: RoomModel = find_game_room(room_info.room_id)
+        if room.room_state == "created":
+            start_game(room_info.db_id)
+            room = find_game_room(room_info.room_id)
+        ctx.misc["room_info"] = room
+        ctx.misc["player_info"] = room.get_player(str(user_info.db_id))
 
 
 class StartGameResponse(BaseResponse):
     async def call(self, ctx: Context) -> MessageInitTypes:
-        room_info: RoomModel = ctx.misc["room_info"]
-        user_info: UserModel = ctx.misc["user_info"]
-        start_game(room_info.db_id)
-        player: PlayerModel = room_info.get_player(str(user_info.db_id))
+        player_info: PlayerModel = ctx.misc["player_info"]
         return f"""Игра началась!
-Ваш номер: {player["number"]}
-Ваша роль: {player["role"]}"""
+Ваш номер: {player_info.number}
+Ваша роль: {player_info.role}"""
 
 
 with open("game_rules.json", encoding="utf8") as file:  # noqa: PTH123
@@ -333,7 +332,7 @@ greeting_script = {
         "waiting": {
             PRE_RESPONSE: {"call_syncronizer": CheckReadyProcessing()},
             RESPONSE: "Пожалуйста, ожидайте начало игры",
-            # PRE_TRANSITION: {"exit_room": ExitRoomProcessing()},
+            PRE_TRANSITION: {"exit_room": ExitRoomProcessing()},
             TRANSITIONS: [
                 Tr(dst=("to_room_flow", "choose"), cnd=cnd.ExactMatch("Выйти")),
                 Tr(dst=("in_game", "start_node"), cnd=cnd.ExactMatch("_ready_")),

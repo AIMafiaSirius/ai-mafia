@@ -62,7 +62,7 @@ def find_game_room(room_id: str) -> RoomModel | None:
     If info about this game room is stored in our database,
     return it. Otherwise, return None.
     """
-    result = rooms_collection.find_one({"room_id": room_id})
+    result = rooms_collection.find_one({"_id": room_id})
     if result is None:
         return None
     return RoomModel(**result)
@@ -95,7 +95,7 @@ def mark_user_as_ready(user_db_id: ObjectId, room_db_id: ObjectId) -> RoomModel:
         msg = "Something's wrong. Room not found"
         raise RuntimeError(msg)
     room_model = RoomModel(**room)
-    room_model.change_player_state(str(user_db_id), state="ready")
+    room_model.change_player_state(user_db_id=str(user_db_id), state="ready")
     list_players_dict = [player.model_dump() for player in room_model.list_players]
     rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": list_players_dict}})
     return room_model
@@ -163,4 +163,4 @@ def start_game(room_db_id: ObjectId):
         lst_players[i]["state"] = "alive"
         lst_players[i]["role"] = lst_role[i]
         lst_players[i]["number"] = i + 1
-    rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": lst_players}})
+    rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": lst_players, "room_state": "started"}})

@@ -1,1 +1,1 @@
-N_PLAYERS = 2
+N_PLAYERS = 1
