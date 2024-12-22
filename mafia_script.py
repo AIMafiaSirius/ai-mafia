@@ -37,7 +37,7 @@ from ai_mafia.db.routines import (
     shoot,
     start_game,
 )
-from ai_mafia.tg_proxy import chatsky_web_api, chatsky_web_interface, send_room_is_ready_signal
+from ai_mafia.tg_proxy import chatsky_web_api, chatsky_web_interface, send_signal
 
 if TYPE_CHECKING:
     import telegram as tg
@@ -230,19 +230,19 @@ class FallBackResponse(BaseResponse):
         return Message(text="К сожалению, я не могу обработать эту команду", reply_markup=keyboard)
 
 
-class RandomRoomExistCondition(BaseCondition):
+class RandomRoomCreatedCondition(BaseCondition):
     async def call(self, ctx: Context) -> MessageInitTypes:
         room = get_random_room()
-        if room is not None:
+        if room is not None and room.room_state == "created":
             ctx.misc["room_info"] = room
             return True
         return False
 
 
-class RoomExistCondition(BaseCondition):
+class RoomCreatedCondition(BaseCondition):
     async def call(self, ctx: Context) -> MessageInitTypes:
         room = find_game_room(ctx.last_request.text)
-        if room is not None:
+        if room is not None and room.room_state == "created":
             ctx.misc["room_info"] = room
             return True
         return False
@@ -285,7 +285,7 @@ class CheckReadyProcessing(ModifyResponse):
         room_info: RoomModel = ctx.misc["room_info"]
         room = mark_user_as_ready(user_info.db_id, room_info.db_id)
         if room.is_room_ready(N_PLAYERS):
-            send_room_is_ready_signal(room.room_id)
+            send_signal(room.room_id, "_ready_")
             return "Мы вас ждали!"
         return await original_response(ctx)
 
@@ -482,19 +482,19 @@ greeting_script = {
             TRANSITIONS: [
                 Tr(
                     dst=("join_id"),
-                    cnd=cnd.All(CallbackCondition(query_string="to_random"), RandomRoomExistCondition()),
+                    cnd=cnd.All(CallbackCondition(query_string="to_random"), RandomRoomCreatedCondition()),
                 ),
                 Tr(
                     dst=("random_not_found"),
-                    cnd=cnd.All(CallbackCondition(query_string="to_random"), cnd.Not(RandomRoomExistCondition())),
+                    cnd=cnd.All(CallbackCondition(query_string="to_random"), cnd.Not(RandomRoomCreatedCondition())),
                 ),
                 Tr(
                     dst=("join_id"),
-                    cnd=cnd.All(cnd.Not(CallbackCondition(query_string="to_random")), RoomExistCondition()),
+                    cnd=cnd.All(cnd.Not(CallbackCondition(query_string="to_random")), RoomCreatedCondition()),
                 ),
                 Tr(
                     dst="room_not_found",
-                    cnd=cnd.All(cnd.Not(CallbackCondition(query_string="to_random")), cnd.Not(RoomExistCondition())),
+                    cnd=cnd.All(cnd.Not(CallbackCondition(query_string="to_random")), cnd.Not(RoomCreatedCondition())),
                 ),
                 Tr(dst="choose", cnd=CallbackCondition(query_string="step_backward")),
             ],

@@ -36,7 +36,7 @@ from ai_mafia.db.routines import (
     mark_user_as_ready,
     start_game,
 )
-from ai_mafia.tg_proxy import chatsky_web_api, chatsky_web_interface, send_room_is_ready_signal
+from ai_mafia.tg_proxy import chatsky_web_api, chatsky_web_interface, send_signal
 
 if TYPE_CHECKING:
     import telegram as tg
@@ -51,6 +51,63 @@ def room_info_string(room: RoomModel):
 Id: {room.room_id}
 Название: {room.name}
 Число участников: {len(room.list_players)}/10"""
+
+
+def shuffle_list(arr: list):
+    for i in range(len(arr)):
+        j = randint(0, i)
+        arr[i], arr[j] = arr[j], arr[i]
+    return arr
+
+
+class NewRoomResponse(BaseResponse):
+    async def call(self, ctx: Context) -> MessageInitTypes:
+        name = ctx.last_request.text
+        room = add_room(name)
+        ctx.misc["room_info"] = room
+
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("✅ Да", callback_data="ok"),
+                    InlineKeyboardButton("⬅️ Назад", callback_data="step_backward"),
+                ]
+            ]
+        )
+        return Message(text=room_info_string(room) + "\n\nВсё верно?", reply_markup=keyboard)
+
+
+class JoinRoomResponse(BaseResponse):
+    async def call(self, ctx: Context) -> MessageInitTypes:
+        room: RoomModel = ctx.misc["room_info"]
+
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("⬅️ Назад", callback_data="step_backward"),
+                    InlineKeyboardButton("✅ Да", callback_data="join"),
+                ]
+            ]
+        )
+        return Message(text=room_info_string(room) + "\n\nПрисоединиться?", reply_markup=keyboard)
+
+
+class RandomRoomExistCondition(BaseCondition):
+    async def call(self, ctx: Context) -> MessageInitTypes:
+        room = get_random_room()
+        if room is not None:
+            ctx.misc["room_info"] = room
+            return True
+        return False
+
+
+class RoomExistCondition(BaseCondition):
+    async def call(self, ctx: Context) -> MessageInitTypes:
+        room = find_game_room(ctx.last_request.text)
+        if room is not None:
+            ctx.misc["room_info"] = room
+            return True
+        return False
 
 
 class InitSessionProcessing(BaseProcessing):
@@ -120,36 +177,33 @@ class RuleResponse(BaseResponse):
         return Message(text=game_rules_data[self.name], reply_markup=keyboard)
 
 
-class NewRoomResponse(BaseResponse):
-    async def call(self, ctx: Context) -> MessageInitTypes:
-        name = ctx.last_request.text
-        room = add_room(name)
-        ctx.misc["room_info"] = room
+class JoinRoomProcessing(BaseProcessing):
+    """Implement room joining logic"""
 
-        keyboard = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("✅ Да", callback_data="ok"),
-                    InlineKeyboardButton("⬅️ Назад", callback_data="step_backward"),
-                ]
-            ]
-        )
-        return Message(text=room_info_string(room) + "\n\nВсё верно?", reply_markup=keyboard)
+    async def call(self, ctx: Context):
+        user_info: UserModel = ctx.misc["user_info"]
+        room_info: RoomModel = ctx.misc["room_info"]
+        join_room(user_info.db_id, room_info.db_id, ctx.id, ctx.misc["chat_id"])
 
 
-class JoinRoomResponse(BaseResponse):
-    async def call(self, ctx: Context) -> MessageInitTypes:
-        room: RoomModel = ctx.misc["room_info"]
+class ExitRoomProcessing(BaseProcessing):
+    """Implement room exiting logic"""
 
-        keyboard = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("⬅️ Назад", callback_data="step_backward"),
-                    InlineKeyboardButton("✅ Да", callback_data="join"),
-                ]
-            ]
-        )
-        return Message(text=room_info_string(room) + "\n\nПрисоединиться?", reply_markup=keyboard)
+    async def call(self, ctx: Context):
+        upd: tg.Update = ctx.last_request.original_message
+        if upd.callback_query.data == "leave":
+            user_info: UserModel = ctx.misc["user_info"]
+            room_info: RoomModel = ctx.misc["room_info"]
+            exit_room(user_info.db_id, room_info.db_id)
+
+
+class CheckReadyProcessing(ModifyResponse):
+    async def modified_response(self, original_response: BaseResponse, ctx: Context):
+        room = mark_user_as_ready(ctx.misc["user_info"].db_id, ctx.misc["room_info"].db_id)
+        if room.is_room_ready():
+            send_signal(ctx.misc["room_info"].room_id)
+            return "Мы вас ждали!"
+        return await original_response(ctx)
 
 
 class ChooseRoomResponse(BaseResponse):
@@ -163,6 +217,20 @@ class ChooseRoomResponse(BaseResponse):
             ]
         )
         return Message(text="Вы хотите присоединться к комнате или создать новую?", reply_markup=keyboard)
+
+
+class AreYouReadyResponse(BaseResponse):
+    async def call(self, _: Context):
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("🚪 Выйти", callback_data="leave"),
+                    InlineKeyboardButton("✅ Готов", callback_data="ready"),
+                ]
+            ]
+        )
+        text = 'Вы присоединились к комнате. Нажмите на кнопку "готов", когда будете готовы начать игру.'
+        return Message(text=text, reply_markup=keyboard)
 
 
 class EnterRoomResponse(BaseResponse):
@@ -204,20 +272,6 @@ class RandomNotFoundResponse(BaseResponse):
 
 
 class AreYouReadyResponse(BaseResponse):
-    async def call(self, _: Context):
-        keyboard = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("🚪 Выйти", callback_data="leave"),
-                    InlineKeyboardButton("✅ Готов", callback_data="ready"),
-                ]
-            ]
-        )
-        text = 'Вы присоединились к комнате. Нажмите на кнопку "готов", когда будете готовы начать игру.'
-        return Message(text=text, reply_markup=keyboard)
-
-
-class WaitingStartResponse(BaseResponse):
     async def call(self, _: Context):
         keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🚪 Выйти", callback_data="leave")]])
         return Message(text="Пожалуйста, ожидайте начала игры", reply_markup=keyboard)

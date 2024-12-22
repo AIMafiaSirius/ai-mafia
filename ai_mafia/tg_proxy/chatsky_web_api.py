@@ -32,29 +32,16 @@ async def respond(
     return context.last_response
 
 
-async def send_message(ctx_id: str, chat_id: int):
+async def send_message(ctx_id: str, chat_id: int, msg: str):
     await asyncio.sleep(3)
-    context = await interface.on_request_async(Message(text="_ready_"), ctx_id)
+    context = await interface.on_request_async(Message(text=msg), ctx_id)
     await bot.send_message(chat_id=chat_id, text=context.last_response.text)
 
 
-def send_room_is_ready_signal(room_id: str):
+def send_signal(room_id: str, msg: str="_skip_"):
     room = find_game_room(room_id)
     if room is None:
         msg = "Room not found :("
         raise ValueError(msg)
-    coroutines = [send_message(player.ctx_id, player.chat_id) for player in room.list_players]
+    coroutines = [send_message(player.ctx_id, player.chat_id, msg) for player in room.list_players]
     [asyncio.create_task(coro) for coro in coroutines]
-
-
-@app.post("/skip", response_model=Message)
-async def skip(
-    ctx_id: str,
-):
-    msg = Message(text="_skip_")
-    context = await interface.on_request_async(msg, ctx_id)
-    return context.last_response
-
-
-def send_skip_signal(ctx_id: str):
-    requests.post(config.make_endpoint("skip"), params={"ctx_id": ctx_id}, timeout=5)
