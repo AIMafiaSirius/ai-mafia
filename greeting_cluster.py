@@ -428,7 +428,7 @@ greeting_script = {
                     dst="room_not_found",
                     cnd=cnd.All(cnd.Not(CallbackCondition(query_string="to_random")), cnd.Not(RoomExistCondition())),
                 ),
-                Tr(dst="choose", cnd=CallbackCondition(query_string= "⬅️ Назад")),
+                Tr(dst="choose", cnd=CallbackCondition(query_string="step_backward")),
             ],
         },
         "random_not_found": {
