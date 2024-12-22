@@ -1,7 +1,6 @@
 import asyncio
 import os
 
-import requests
 import telegram as tg
 from chatsky import Message
 from chatsky.messengers.common.interface import CallbackMessengerInterface
@@ -38,7 +37,7 @@ async def send_message(ctx_id: str, chat_id: int, msg: str):
     await bot.send_message(chat_id=chat_id, text=context.last_response.text)
 
 
-def send_signal(room_id: str, msg: str="_skip_"):
+def send_signal(room_id: str, msg: str = "_skip_"):
     room = find_game_room(room_id)
     if room is None:
         msg = "Room not found :("
