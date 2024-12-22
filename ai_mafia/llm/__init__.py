@@ -1,1 +1,1 @@
-from .llm_do import main
+from .llm_do import get_response

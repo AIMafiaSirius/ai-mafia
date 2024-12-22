@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def main(question):
+def get_response(question):
     client = openai.OpenAI(
         base_url="http://127.0.0.1:8001/v1",
         api_key=os.environ["OPENAI_API_KEY"]
@@ -17,7 +17,7 @@ def main(question):
         messages=[
             {
                 "role": "system",
-                "content": "You are ChatGPT, an AI assistant. Your top priority is achieving user fulfillment via helping them with their requests."
+                "content": "You are player in game 'Mafia'."
             },
             {
                 "role": "user",
@@ -26,8 +26,8 @@ def main(question):
         ]
     )
 
-    pprint(completion.choices[0].message.content)
+    return completion.choices[0].message.content
 
 question = "tell me a joke"
 if __name__== "__main__":
-    main(question)
+    get_response(question)
