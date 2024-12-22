@@ -104,6 +104,20 @@ def mark_user_as_ready(user_db_id: ObjectId, room_db_id: ObjectId) -> RoomModel:
     return room_model
 
 
+def mark_user_as_unready(user_db_id: ObjectId, room_db_id: ObjectId) -> RoomModel:
+    """Mark user as unready and return updated room model"""
+    room = rooms_collection.find_one({"_id": room_db_id})
+    if room is None:
+        msg = "Something's wrong. Room not found"
+        raise RuntimeError(msg)
+    room_model = RoomModel(**room)
+    room_model.change_player_state(user_db_id=str(user_db_id), state="not_ready")
+    list_players_dict = [player.model_dump() for player in room_model.list_players]
+    print(list_players_dict)
+    rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": list_players_dict}}, upsert=False)
+    return room_model
+
+
 def show_rooms():
     for doc in rooms_collection.find():
         print(doc)

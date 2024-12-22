@@ -36,6 +36,7 @@ from ai_mafia.db.routines import (
     get_random_room,
     join_room,
     mark_user_as_ready,
+    mark_user_as_unready,
     murder,
     send_player_messange,
     shoot,
@@ -313,6 +314,16 @@ class ExitRoomProcessing(BaseProcessing):
             room_info: RoomModel = ctx.misc["room_info"]
             exit_room(user_info.db_id, room_info.db_id)
             ctx.misc["room_info"] = None
+
+
+class NotReadyProcessing(BaseProcessing):
+    async def call(self, ctx: Context):
+        upd: tg.Update | None = ctx.last_request.original_message
+        if upd is not None and upd.callback_query.data == "not_ready":
+            user_info: UserModel = ctx.misc["user_info"]
+            room_info: RoomModel = ctx.misc["room_info"]
+            mark_user_as_unready(user_info.db_id, room_info.db_id)
+            ctx.misc["room_info"] = find_game_room(room_info.room_id)
 
 
 class CheckReadyProcessing(ModifyResponse):
@@ -639,6 +650,7 @@ greeting_script = {
             PRE_TRANSITION: {
                 "get_rules": GetRulesProcessing(from_where=("in_room_flow", "waiting")),
                 "exit_room": ExitRoomProcessing(),
+                "not_ready": NotReadyProcessing(),
             },
             TRANSITIONS: [
                 Tr(dst=("to_room_flow", "choose"), cnd=CallbackCondition(query_string="leave")),
