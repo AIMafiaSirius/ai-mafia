@@ -62,7 +62,7 @@ def find_game_room(room_id: str) -> RoomModel | None:
     If info about this game room is stored in our database,
     return it. Otherwise, return None.
     """
-    result = rooms_collection.find_one({"_id": room_id})
+    result = rooms_collection.find_one({"room_id": room_id})
     if result is None:
         return None
     return RoomModel(**result)
