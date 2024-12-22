@@ -176,10 +176,12 @@ def shoot(room_db_id: ObjectId, i: int):
     rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": lst_players}})
 
 
-def is_murder(room_id: str) -> bool:
+def murder(room_id: str) -> bool:
     room = find_game_room(room_id)
-    room.kill()
-    rooms_collection.update_one({"_id": room.db_id}, {"$set": {"list_players": room.list_players}})
+    res = room.kill()
+    list_players_dict = [player.model_dump() for player in room.list_players]
+    rooms_collection.update_one({"room_id": room_id}, {"$set": {"list_players": list_players_dict}})
+    return res
 
 
 def send_player_messange(room: RoomModel, user_id: str, msg: str):

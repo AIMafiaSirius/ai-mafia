@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 
 from ai_mafia.config import load_config
-from ai_mafia.db.routines import find_game_room
+from ai_mafia.db.models import RoomModel
 
 load_dotenv()
 
@@ -37,8 +37,7 @@ async def send_message(ctx_id: str, chat_id: int, msg: str):
     await bot.send_message(chat_id=chat_id, text=context.last_response.text)
 
 
-def send_signal(room_id: str, msg: str = "_skip_"):
-    room = find_game_room(room_id)
+def send_signal(room: RoomModel | None, msg: str = "_skip_"):
     if room is None:
         msg = "Room not found :("
         raise ValueError(msg)

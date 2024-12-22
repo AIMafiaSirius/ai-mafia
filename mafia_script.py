@@ -34,9 +34,9 @@ from ai_mafia.db.routines import (
     find_game_room,
     find_user,
     get_random_room,
-    is_murder,
     join_room,
     mark_user_as_ready,
+    murder,
     send_player_messange,
     shoot,
     start_game,
@@ -321,7 +321,7 @@ class CheckReadyProcessing(ModifyResponse):
         room_info: RoomModel = ctx.misc["room_info"]
         room = mark_user_as_ready(user_info.db_id, room_info.db_id)
         if room.is_room_ready(N_PLAYERS):
-            send_signal(room.room_id, "_ready_")
+            send_signal(find_game_room(room_info.room_id), "_ready_")
             return "Мы вас ждали!"
         return await original_response(ctx)
 
@@ -334,7 +334,7 @@ class StartGameProcessing(ModifyResponse):
         room = find_game_room(room_info.room_id)
         if ctx.id == room.list_players[0].ctx_id:
             start_game(room.db_id)
-            send_signal(room.room_id)
+            send_signal(find_game_room(room_info.room_id))
         return await original_response(ctx)
 
 
@@ -344,7 +344,7 @@ class StartGameResponse(BaseResponse):
         room_info: RoomModel = ctx.misc["room_info"]
         room: RoomModel = find_game_room(room_info.room_id)
         ctx.misc["room_info"] = room
-        player_info: PlayerModel = room_info.get_player(str(user_info.db_id))
+        player_info: PlayerModel = room.get_player(str(user_info.db_id))
         return f"""Игра началась!
 Ваш номер: {player_info.number}
 Ваша роль: {player_info.role}"""
@@ -361,7 +361,7 @@ class ShootingResponse(BaseResponse):
         player_info: PlayerModel = room_info.get_player(str(user_info.db_id))
         if ctx.id == room_info.list_players[0].ctx_id:
             await asyncio.sleep(7)
-            send_signal(room_info.room_id)
+            send_signal(find_game_room(room_info.room_id))
         if player_info.role in ("мафия", "дон") and player_info.state == "alive":
             return "Наступает ночь! Напишите номер игрока, в которого будете стрелять. У вас 10 секунд"
         return "Наступает ночь! Мафия выбирает, кого убить"
@@ -393,7 +393,7 @@ class CheckResponse(BaseResponse):
         player_info: PlayerModel = room_info.get_player(str(user_info.db_id))
         if ctx.id == room_info.list_players[0].ctx_id:
             await asyncio.sleep(7)
-            send_signal(room_info.room_id)
+            send_signal(find_game_room(room_info.room_id))
         if player_info.role == "комиссар" and player_info.state == "alive":
             return "Вы - комиссар. Напишите номер игрока, которого хотите проверить. У вас 10 секунд"
         if player_info.role == "дон" and player_info.state == "alive":
@@ -423,7 +423,9 @@ class ComsCheckResponse(BaseResponse):
         if request in NUM_PLAYERS:
             num = int(request)
             role = ctx.misc["room_info"].list_players[num - 1].role
-            color = role in ("мафия", "дон") if "чёрный" else "красный"
+            color = "красный"
+            if role in ("мафия", "дон"):
+                color = "чёрный"
             return f"Этот игрок {color}"
         return "Напишите номер игрока, которого хотите проверить"
 
@@ -434,7 +436,9 @@ class DonsCheckResponse(BaseResponse):
         if request in NUM_PLAYERS:
             num = int(request)
             role = ctx.misc["room_info"].list_players[num - 1].role
-            is_com = role == "комиссар" if "комиссар" else "не комиссар"
+            is_com = "не комиссар"
+            if role == "комиссар":
+                role = "комиссар"
             return f"Этот игрок {is_com}"
         return "Напишите номер игрока, которого хотите проверить"
 
@@ -443,10 +447,10 @@ class EndNightProcessing(BaseProcessing):
     async def call(self, ctx: Context):
         room_info: RoomModel = ctx.misc["room_info"]
         if ctx.id == room_info.list_players[0].ctx_id:
-            if is_murder(room_info.room_id):
-                send_signal(room_info.room_id, "_kill_")
+            if murder(room_info.room_id):
+                send_signal(find_game_room(room_info.room_id), "_kill_")
             else:
-                send_signal(room_info.room_id)
+                send_signal(find_game_room(room_info.room_id))
 
 
 class EndNightResponse(BaseResponse):

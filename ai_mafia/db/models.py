@@ -94,12 +94,15 @@ class RoomModel(BaseModel):
                 cnt += 1
         return cnt
 
-    def kill(self):
+    def kill(self) -> bool:
         shoot_cnt = self.get_cnt_black()
+        flag = False
         for player in self.list_players:
             if player.shoot_cnt == shoot_cnt:
                 player.state = "pre_dead"
+                flag = True
             player.shoot_cnt = 0
+        return flag
 
     def get_pre_dead_player(self) -> PlayerModel | None:
         for player in self.list_players:
