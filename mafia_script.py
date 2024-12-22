@@ -1,5 +1,4 @@
 import json
-from random import randint
 from typing import TYPE_CHECKING
 
 import chatsky.conditions as cnd
@@ -24,6 +23,7 @@ from dotenv import load_dotenv
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from ai_mafia.config import load_config
+from ai_mafia.constants import N_PLAYERS, NUM_PLAYERS
 from ai_mafia.db.models import RoomModel
 from ai_mafia.db.routines import (
     add_room,
@@ -34,13 +34,15 @@ from ai_mafia.db.routines import (
     get_random_room,
     join_room,
     mark_user_as_ready,
+    shoot,
+    start_game,
 )
 from ai_mafia.tg_proxy import chatsky_web_api, chatsky_web_interface, send_signal
 
 if TYPE_CHECKING:
     import telegram as tg
 
-    from ai_mafia.db.models import UserModel
+    from ai_mafia.db.models import PlayerModel, UserModel
 
 load_dotenv()
 
@@ -50,63 +52,6 @@ def room_info_string(room: RoomModel):
 Id: {room.room_id}
 Название: {room.name}
 Число участников: {len(room.list_players)}/10"""
-
-
-def shuffle_list(arr: list):
-    for i in range(len(arr)):
-        j = randint(0, i)
-        arr[i], arr[j] = arr[j], arr[i]
-    return arr
-
-
-class NewRoomResponse(BaseResponse):
-    async def call(self, ctx: Context) -> MessageInitTypes:
-        name = ctx.last_request.text
-        room = add_room(name)
-        ctx.misc["room_info"] = room
-
-        keyboard = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("✅ Да", callback_data="ok"),
-                    InlineKeyboardButton("⬅️ Назад", callback_data="step_backward"),
-                ]
-            ]
-        )
-        return Message(text=room_info_string(room) + "\n\nВсё верно?", reply_markup=keyboard)
-
-
-class JoinRoomResponse(BaseResponse):
-    async def call(self, ctx: Context) -> MessageInitTypes:
-        room: RoomModel = ctx.misc["room_info"]
-
-        keyboard = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("⬅️ Назад", callback_data="step_backward"),
-                    InlineKeyboardButton("✅ Да", callback_data="join"),
-                ]
-            ]
-        )
-        return Message(text=room_info_string(room) + "\n\nПрисоединиться?", reply_markup=keyboard)
-
-
-class RandomRoomExistCondition(BaseCondition):
-    async def call(self, ctx: Context) -> MessageInitTypes:
-        room = get_random_room()
-        if room is not None:
-            ctx.misc["room_info"] = room
-            return True
-        return False
-
-
-class RoomExistCondition(BaseCondition):
-    async def call(self, ctx: Context) -> MessageInitTypes:
-        room = find_game_room(ctx.last_request.text)
-        if room is not None:
-            ctx.misc["room_info"] = room
-            return True
-        return False
 
 
 class InitSessionProcessing(BaseProcessing):
@@ -123,16 +68,6 @@ class InitSessionProcessing(BaseProcessing):
             user_info = add_user(tg_id, user_nickname)
         ctx.misc["user_info"] = user_info
         ctx.misc["chat_id"] = tg_info.effective_chat.id
-
-
-class CallbackCondition(BaseCondition):
-    query_string: str
-
-    async def call(self, ctx: Context):
-        upd: tg.Update = ctx.last_request.original_message
-        if upd.callback_query is None:
-            return False
-        return upd.callback_query.data == self.query_string
 
 
 class GreetingResponse(BaseResponse):
@@ -186,33 +121,36 @@ class RuleResponse(BaseResponse):
         return Message(text=game_rules_data[self.name], reply_markup=keyboard)
 
 
-class JoinRoomProcessing(BaseProcessing):
-    """Implement room joining logic"""
+class NewRoomResponse(BaseResponse):
+    async def call(self, ctx: Context) -> MessageInitTypes:
+        name = ctx.last_request.text
+        room = add_room(name)
+        ctx.misc["room_info"] = room
 
-    async def call(self, ctx: Context):
-        user_info: UserModel = ctx.misc["user_info"]
-        room_info: RoomModel = ctx.misc["room_info"]
-        join_room(user_info.db_id, room_info.db_id, ctx.id, ctx.misc["chat_id"])
-
-
-class ExitRoomProcessing(BaseProcessing):
-    """Implement room exiting logic"""
-
-    async def call(self, ctx: Context):
-        upd: tg.Update = ctx.last_request.original_message
-        if upd.callback_query.data == "leave":
-            user_info: UserModel = ctx.misc["user_info"]
-            room_info: RoomModel = ctx.misc["room_info"]
-            exit_room(user_info.db_id, room_info.db_id)
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("✅ Да", callback_data="ok"),
+                    InlineKeyboardButton("⬅️ Назад", callback_data="step_backward"),
+                ]
+            ]
+        )
+        return Message(text=room_info_string(room) + "\n\nВсё верно?", reply_markup=keyboard)
 
 
-class CheckReadyProcessing(ModifyResponse):
-    async def modified_response(self, original_response: BaseResponse, ctx: Context):
-        room = mark_user_as_ready(ctx.misc["user_info"].db_id, ctx.misc["room_info"].db_id)
-        if room.is_room_ready():
-            send_signal(ctx.misc["room_info"].room_id)
-            return "Мы вас ждали!"
-        return await original_response(ctx)
+class JoinRoomResponse(BaseResponse):
+    async def call(self, ctx: Context) -> MessageInitTypes:
+        room: RoomModel = ctx.misc["room_info"]
+
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("⬅️ Назад", callback_data="step_backward"),
+                    InlineKeyboardButton("✅ Да", callback_data="join"),
+                ]
+            ]
+        )
+        return Message(text=room_info_string(room) + "\n\nПрисоединиться?", reply_markup=keyboard)
 
 
 class ChooseRoomResponse(BaseResponse):
@@ -226,20 +164,6 @@ class ChooseRoomResponse(BaseResponse):
             ]
         )
         return Message(text="Вы хотите присоединться к комнате или создать новую?", reply_markup=keyboard)
-
-
-class AreYouReadyResponse(BaseResponse):
-    async def call(self, _: Context):
-        keyboard = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("🚪 Выйти", callback_data="leave"),
-                    InlineKeyboardButton("✅ Готов", callback_data="ready"),
-                ]
-            ]
-        )
-        text = 'Вы присоединились к комнате. Нажмите на кнопку "готов", когда будете готовы начать игру.'
-        return Message(text=text, reply_markup=keyboard)
 
 
 class EnterRoomResponse(BaseResponse):
@@ -280,6 +204,20 @@ class RandomNotFoundResponse(BaseResponse):
         return Message(text="Сейчас нет открытых комнат. Создать новую?", reply_markup=keyboard)
 
 
+class AreYouReadyResponse(BaseResponse):
+    async def call(self, _: Context):
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("🚪 Выйти", callback_data="leave"),
+                    InlineKeyboardButton("✅ Готов", callback_data="ready"),
+                ]
+            ]
+        )
+        text = 'Вы присоединились к комнате. Нажмите на кнопку "готов", когда будете готовы начать игру.'
+        return Message(text=text, reply_markup=keyboard)
+
+
 class WaitingStartResponse(BaseResponse):
     async def call(self, _: Context):
         keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🚪 Выйти", callback_data="leave")]])
@@ -292,14 +230,162 @@ class FallBackResponse(BaseResponse):
         return Message(text="К сожалению, я не могу обработать эту команду", reply_markup=keyboard)
 
 
+class RandomRoomExistCondition(BaseCondition):
+    async def call(self, ctx: Context) -> MessageInitTypes:
+        room = get_random_room()
+        if room is not None:
+            ctx.misc["room_info"] = room
+            return True
+        return False
+
+
+class RoomExistCondition(BaseCondition):
+    async def call(self, ctx: Context) -> MessageInitTypes:
+        room = find_game_room(ctx.last_request.text)
+        if room is not None:
+            ctx.misc["room_info"] = room
+            return True
+        return False
+
+
+class CallbackCondition(BaseCondition):
+    query_string: str
+
+    async def call(self, ctx: Context):
+        upd: tg.Update | None = ctx.last_request.original_message
+        if upd is None or upd.callback_query is None:
+            return False
+        return upd.callback_query.data == self.query_string
+
+
+class JoinRoomProcessing(BaseProcessing):
+    """Implement room joining logic"""
+
+    async def call(self, ctx: Context):
+        user_info: UserModel = ctx.misc["user_info"]
+        room_info: RoomModel = ctx.misc["room_info"]
+        join_room(user_info.db_id, room_info.db_id, ctx.id, ctx.misc["chat_id"])
+
+
+class ExitRoomProcessing(BaseProcessing):
+    """Implement room exiting logic"""
+
+    async def call(self, ctx: Context):
+        upd: tg.Update | None = ctx.last_request.original_message
+        if upd is not None and upd.callback_query.data == "leave":
+            user_info: UserModel = ctx.misc["user_info"]
+            room_info: RoomModel = ctx.misc["room_info"]
+            exit_room(user_info.db_id, room_info.db_id)
+            ctx.misc["room_info"] = None
+
+
+class CheckReadyProcessing(ModifyResponse):
+    async def modified_response(self, original_response: BaseResponse, ctx: Context):
+        user_info: UserModel = ctx.misc["user_info"]
+        room_info: RoomModel = ctx.misc["room_info"]
+        room = mark_user_as_ready(user_info.db_id, room_info.db_id)
+        if room.is_room_ready(N_PLAYERS):
+            send_signal(room.room_id, "_ready_")
+            return "Мы вас ждали!"
+        return await original_response(ctx)
+
+
+class StartGameProcessing(BaseProcessing):
+    """Implement game starting logic"""
+
+    async def call(self, ctx: Context):
+        room_info: RoomModel = ctx.misc["room_info"]
+        user_info: UserModel = ctx.misc["user_info"]
+        room: RoomModel = find_game_room(room_info.room_id)
+        if room.room_state == "created":
+            start_game(room_info.db_id)
+            room = find_game_room(room_info.room_id)
+        ctx.misc["room_info"] = room
+        ctx.misc["player_info"] = room.get_player(str(user_info.db_id))
+
+
+class StartGameResponse(BaseResponse):
+    async def call(self, ctx: Context) -> MessageInitTypes:
+        player_info: PlayerModel = ctx.misc["player_info"]
+        return f"""Игра началась!
+Ваш номер: {player_info.number}
+Ваша роль: {player_info.role}"""
+
+
 with open("game_rules.json", encoding="utf8") as file:  # noqa: PTH123
     game_rules_data = json.load(file)
 
 
-class FallbackResponse(BaseResponse):
+class ShootingResponse(BaseResponse):
     async def call(self, ctx: Context):
-        txt = ctx.last_request.text
-        return f"К сожалению, я не могу обработать команду: {txt}"
+        player_info: PlayerModel = ctx.misc["player_info"]
+        if player_info.role in ("мафия", "дон") and player_info.state == "alive":
+            return "Наступает ночь! Напишите номер игрока, в которого будете стрелять"
+        return "Наступает ночь! Мафия выбирает, кого убить"
+
+
+class ShootingProcessing(BaseProcessing):
+    """Implement shooting logic"""
+
+    async def call(self, ctx: Context):
+        player_info: PlayerModel = ctx.misc["player_info"]
+        request = ctx.last_request.text
+        if player_info.role in ("мафия", "дон") and request in NUM_PLAYERS:
+            shoot(room_db_id=ctx.misc["room_info"].db_id, i=int(request) - 1)
+
+
+class CheckResponse(BaseResponse):
+    async def call(self, ctx: Context):
+        player_info: PlayerModel = ctx.misc["player_info"]
+        if player_info.role == "комиссар" and player_info.state == "alive":
+            return "Вы - комиссар. Напишите номер игрока, которого хотите проверить"
+        if player_info.role == "дон" and player_info.state == "alive":
+            return "Вы - дон мафии. Напишите номер игрока, которого хотите проверить на комиссарство"
+        return "Дон и комиссар делают проверки"
+
+
+class IsCom(BaseCondition):
+    async def call(self, ctx: Context) -> bool:
+        return ctx.misc["player_info"].role == "комиссар"
+
+
+class IsDon(BaseCondition):
+    async def call(self, ctx: Context) -> bool:
+        return ctx.misc["player_info"].role == "дон"
+
+
+class ComsCheckResponse(BaseResponse):
+    async def call(self, ctx: Context):
+        request = ctx.last_request.text
+        if request in NUM_PLAYERS:
+            num = int(request)
+            role = ctx.misc["room_info"].list_players[num - 1].role
+            color = role in ("мафия", "дон") if "чёрный" else "красный"
+            return f"Этот игрок {color}"
+        return "Напишите номер игрока, которого хотите проверить"
+
+
+class DonsCheckResponse(BaseResponse):
+    async def call(self, ctx: Context):
+        request = ctx.last_request.text
+        if request in NUM_PLAYERS:
+            num = int(request)
+            role = ctx.misc["room_info"].list_players[num - 1].role
+            is_com = role == "комиссар" if "комиссар" else "не комиссар"
+            return f"Этот игрок {is_com}"
+        return "Напишите номер игрока, которого хотите проверить"
+
+
+class EndNightResponse(BaseResponse):
+    async def call(self, ctx: Context):
+        room_info: RoomModel = ctx.misc["room_info"]
+        room = find_game_room(room_info.room_id)
+        mafia_cnt = room.get_cnt_black()
+        for player in room.list_players:
+            if player.shoot_cnt == mafia_cnt and player.state == "alive":
+                room.change_player_state(player.user_id, "dead")
+                return ""
+        return ""
 
 
 greeting_script = {
@@ -454,8 +540,29 @@ greeting_script = {
     },
     "in_game": {
         "start_node": {
-            # PRE_RESPONSE: {"init_game": StartGameProcessing()},
-            RESPONSE: "Игра началась",
+            PRE_RESPONSE: {"init_game": StartGameProcessing()},
+            RESPONSE: StartGameResponse(),
+            TRANSITIONS: [Tr(dst=("shooting_phase"))],
+        },
+        "shooting_phase": {
+            RESPONSE: ShootingResponse(),
+            PRE_TRANSITION: {"shoot": ShootingProcessing()},
+            TRANSITIONS: [Tr(dst=("checks_phase"))],
+        },
+        "checks_phase": {
+            RESPONSE: CheckResponse(),
+            TRANSITIONS: [Tr(dst=("coms_check"), cnd=IsCom()), Tr(dst=("dons_check"), cnd=IsDon())],
+        },
+        "coms_check": {
+            RESPONSE: ComsCheckResponse(),
+            TRANSITIONS: [Tr(dst=("end_of_night"))],
+        },
+        "dons_check": {
+            RESPONSE: DonsCheckResponse(),
+            TRANSITIONS: [Tr(dst=("end_of_night"))],
+        },
+        "end_of_night": {
+            RESPONSE: "...",
         },
     },
 }
