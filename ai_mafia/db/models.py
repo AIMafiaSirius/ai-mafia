@@ -28,7 +28,6 @@ PlayerState = Literal["not_ready", "ready", "alive", "dead"]
 
 
 class PlayerModel(BaseModel):
-
     user_id: str | None
 
     role: str | None = None
@@ -85,7 +84,6 @@ class RoomModel(BaseModel):
                 return player
         msg = "Something's wrong. Player not found"
         raise ValueError(msg)
-
 
     def get_cnt_black(self):
         cnt = 0

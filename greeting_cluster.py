@@ -53,134 +53,6 @@ Id: {room.room_id}
 Число участников: {len(room.list_players)}/10"""
 
 
-class ShowRulesResponse(BaseResponse):
-    async def call(self, _: Context):
-        keyboard = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("Полные правила", callback_data="full_rules"),
-                ],
-                [
-                    InlineKeyboardButton("Роли", callback_data="game_roles"),
-                ],
-                [
-                    InlineKeyboardButton("Ход дня", callback_data="day_phase"),
-                    InlineKeyboardButton("Ход голосования", callback_data="voting_phase"),
-                    InlineKeyboardButton("Ход ночи", callback_data="night_phase"),
-                ],
-                [
-                    InlineKeyboardButton("Начало и конец игры", callback_data="start_and_end")
-                ],
-                [
-                    InlineKeyboardButton("Назад", callback_data="step_backward"),
-                    InlineKeyboardButton("Вернуться к игре", callback_data="step_backward"),
-                ]
-            ]
-        )
-        return Message(text="Выберите раздел правил, который хотите увидеть", reply_markup=keyboard)
-
-
-class RuleResponse(BaseResponse):
-    name: str
-    async def call(self, _: Context):
-        keyboard = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("Назад", callback_data="step_backward")
-                ]
-            ]
-        )
-        return Message(text=game_rules_data[self.name], reply_markup=keyboard)
-
-
-class ChooseRoomResponse(BaseResponse):
-    async def call(self, _: Context):
-        keyboard = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("Создать", callback_data="create_room"),
-                    InlineKeyboardButton("Присоединиться", callback_data="join_room")
-                ]
-            ]
-        )
-        return Message(text="Вы хотите присоединться к комнате или создать новую?", reply_markup=keyboard)
-
-
-class AreYouReadyResponse(BaseResponse):
-    async def call(self, _: Context):
-        keyboard = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("Выйти", callback_data="leave"),
-                    InlineKeyboardButton("Готов", callback_data="ready")
-                ]
-            ]
-        )
-        text = "Вы присоединились к комнате. Нажмите на кнопку \"готов\", когда будете готовы начать игру."  # noqa: Q003
-        return Message(text=text, reply_markup=keyboard)
-
-
-class EnterRoomResponse(BaseResponse):
-    async def call(self, _: Context):
-        keyboard = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("К случайной", callback_data="to_random"),
-                ]
-            ]
-        )
-        return Message(text="Присоединитесь к случайной комнате, либо введите ID", reply_markup=keyboard)
-
-
-class RoomNotFoundResponse(BaseResponse):
-    async def call(self, _: Context):
-        keyboard = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("Назад", callback_data="step_backward"),
-                ]
-            ]
-        )
-        return Message(text="Комната с таким ID не найдена", reply_markup=keyboard)
-
-
-class RandomNotFoundResponse(BaseResponse):
-    async def call(self, _: Context):
-        keyboard = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("Да", callback_data="create"),
-                    InlineKeyboardButton("Назад", callback_data="step_backward")
-                ]
-            ]
-        )
-        return Message(text="Сейчас нет открытых комнат. Создать новую?", reply_markup=keyboard)
-
-
-class WaitingStartResponse(BaseResponse):
-    async def call(self, _: Context):
-        keyboard = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("Выйти", callback_data="leave")
-                ]
-            ]
-        )
-        return Message(text="Пожалуйста, ожидайте начала игры", reply_markup=keyboard)
-
-
-class FallBackResponse(BaseResponse):
-    async def call(self, _: Context):
-        keyboard = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("Назад", callback_data="step_backward")
-                ]
-            ]
-        )
-        return Message(text="К сожалению, я не могу обработать эту команду", reply_markup=keyboard)
-
-
 class InitSessionProcessing(BaseProcessing):
     """
     Add user tg id to database.
@@ -202,40 +74,159 @@ class GreetingResponse(BaseResponse):
     Greet and provide info about user
     """
 
-    async def call(self, ctx: Context) -> MessageInitTypes:
+    async def call(self, ctx: Context):
         user_info: UserModel = ctx.misc["user_info"]
         text = f"Привет, {user_info.tg_nickname}! Вам нужна инструкция по игре?"
         keyboard = InlineKeyboardMarkup(
             [
                 [
-                    InlineKeyboardButton("Да", callback_data="instr_yes"),
-                    InlineKeyboardButton("Нет", callback_data="instr_no"),
+                    InlineKeyboardButton("✅ Да", callback_data="instr_yes"),
+                    InlineKeyboardButton("❌ Нет", callback_data="instr_no"),
                 ]
             ]
         )
         return Message(text=text, reply_markup=keyboard)
 
 
+class ShowRulesResponse(BaseResponse):
+    async def call(self, _: Context):
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("📝 Полные правила", callback_data="full_rules"),
+                ],
+                [
+                    InlineKeyboardButton("🎭 Роли", callback_data="game_roles"),
+                ],
+                [
+                    InlineKeyboardButton("🌅 День", callback_data="day_phase"),
+                    InlineKeyboardButton("🗣️ Голосование", callback_data="voting_phase"),
+                    InlineKeyboardButton("🌃 Ночь", callback_data="night_phase"),
+                ],
+                [InlineKeyboardButton("🕹️ Начало и конец игры", callback_data="start_and_end")],
+                [
+                    InlineKeyboardButton("⬅️ Вернуться к игре", callback_data="step_backward"),
+                ],
+            ]
+        )
+        return Message(text="Выберите раздел правил, который хотите увидеть", reply_markup=keyboard)
+
+
+class RuleResponse(BaseResponse):
+    name: str
+
+    async def call(self, _: Context):
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Назад", callback_data="step_backward")]])
+        return Message(text=game_rules_data[self.name], reply_markup=keyboard)
+
+
 class NewRoomResponse(BaseResponse):
     async def call(self, ctx: Context) -> MessageInitTypes:
         name = ctx.last_request.text
-        room_info = add_room(name)
-        ctx.misc["room_info"] = room_info
-        return room_info_string(room_info) + "\n\nПрисоединиться?"
+        room = add_room(name)
+        ctx.misc["room_info"] = room
+
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("✅ Да", callback_data="ok"),
+                    InlineKeyboardButton("⬅️ Назад", callback_data="step_backward"),
+                ]
+            ]
+        )
+        return Message(text=room_info_string(room) + "\n\nВсё верно?", reply_markup=keyboard)
 
 
 class JoinRoomResponse(BaseResponse):
     async def call(self, ctx: Context) -> MessageInitTypes:
         room: RoomModel = ctx.misc["room_info"]
+
         keyboard = InlineKeyboardMarkup(
             [
                 [
-                    InlineKeyboardButton("Назад", callback_data="step_backward"),
-                    InlineKeyboardButton("Да", callback_data="join"),
+                    InlineKeyboardButton("⬅️ Назад", callback_data="step_backward"),
+                    InlineKeyboardButton("✅ Да", callback_data="join"),
                 ]
             ]
         )
         return Message(text=room_info_string(room) + "\n\nПрисоединиться?", reply_markup=keyboard)
+
+
+class ChooseRoomResponse(BaseResponse):
+    async def call(self, _: Context):
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("⚙️ Создать", callback_data="create_room"),
+                    InlineKeyboardButton("🚪 Присоединиться", callback_data="join_room"),
+                ]
+            ]
+        )
+        return Message(text="Вы хотите присоединться к комнате или создать новую?", reply_markup=keyboard)
+
+
+class EnterRoomResponse(BaseResponse):
+    async def call(self, _: Context):
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("🎲 К случайной", callback_data="to_random"),
+                ],
+                [InlineKeyboardButton("⬅️ Назад", callback_data="step_backward")],
+            ]
+        )
+        return Message(text="Присоединитесь к случайной комнате, либо введите ID", reply_markup=keyboard)
+
+
+class RoomNotFoundResponse(BaseResponse):
+    async def call(self, _: Context):
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("⬅️ Назад", callback_data="step_backward"),
+                ]
+            ]
+        )
+        return Message(text="Комната с таким ID не найдена", reply_markup=keyboard)
+
+
+class RandomNotFoundResponse(BaseResponse):
+    async def call(self, _: Context):
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("✅ Да", callback_data="create"),
+                    InlineKeyboardButton("⬅️ Назад", callback_data="step_backward"),
+                ]
+            ]
+        )
+        return Message(text="Сейчас нет открытых комнат. Создать новую?", reply_markup=keyboard)
+
+
+class AreYouReadyResponse(BaseResponse):
+    async def call(self, _: Context):
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("🚪 Выйти", callback_data="leave"),
+                    InlineKeyboardButton("✅ Готов", callback_data="ready"),
+                ]
+            ]
+        )
+        text = 'Вы присоединились к комнате. Нажмите на кнопку "готов", когда будете готовы начать игру.'
+        return Message(text=text, reply_markup=keyboard)
+
+
+class WaitingStartResponse(BaseResponse):
+    async def call(self, _: Context):
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🚪 Выйти", callback_data="leave")]])
+        return Message(text="Пожалуйста, ожидайте начала игры", reply_markup=keyboard)
+
+
+class FallBackResponse(BaseResponse):
+    async def call(self, _: Context):
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Назад", callback_data="step_backward")]])
+        return Message(text="К сожалению, я не могу обработать эту команду", reply_markup=keyboard)
 
 
 class RandomRoomExistCondition(BaseCondition):
@@ -279,7 +270,8 @@ class ExitRoomProcessing(BaseProcessing):
     """Implement room exiting logic"""
 
     async def call(self, ctx: Context):
-        if ctx.last_request.text == "Выйти":
+        upd: tg.Update = ctx.last_request.original_message
+        if upd.callback_query.data == "leave":
             user_info: UserModel = ctx.misc["user_info"]
             room_info: RoomModel = ctx.misc["room_info"]
             exit_room(user_info.db_id, room_info.db_id)
@@ -320,12 +312,6 @@ class StartGameResponse(BaseResponse):
 
 with open("game_rules.json", encoding="utf8") as file:  # noqa: PTH123
     game_rules_data = json.load(file)
-
-
-class FallbackResponse(BaseResponse):
-    async def call(self, ctx: Context):
-        txt = ctx.last_request.text
-        return f"К сожалению, я не могу обработать команду: {txt}"
 
 
 class ShootingResponse(BaseResponse):
@@ -382,7 +368,7 @@ class MafiaChoiceCheck(BaseProcessing):
 greeting_script = {
     "global_flow": {
         "fallback_node": {
-            RESPONSE: FallbackResponse(),
+            RESPONSE: FallBackResponse(),
             TRANSITIONS: [Tr(dst=dst.Previous(), cnd=CallbackCondition(query_string="step_backward"))],
         },
     },
@@ -394,8 +380,20 @@ greeting_script = {
         "greeting_node": {
             RESPONSE: GreetingResponse(),
             TRANSITIONS: [
-                Tr(dst=("rules_flow", "game_rules"), cnd=CallbackCondition(query_string="instr_yes")),
+                Tr(dst=("get_rules"), cnd=CallbackCondition(query_string="instr_yes")),
                 Tr(dst=("to_room_flow", "choose"), cnd=CallbackCondition(query_string="instr_no")),
+            ],
+        },
+        "get_rules": {
+            RESPONSE: ShowRulesResponse(),
+            TRANSITIONS: [
+                Tr(dst=("to_room_flow", "choose"), cnd=CallbackCondition(query_string="step_backward")),
+                Tr(dst=("rules_flow", "game_rules"), cnd=CallbackCondition(query_string="full_rules")),
+                Tr(dst=("rules_flow", "game_roles"), cnd=CallbackCondition(query_string="roles")),
+                Tr(dst=("rules_flow", "day_phase"), cnd=CallbackCondition(query_string="day_phase")),
+                Tr(dst=("rules_flow", "voting_phase"), cnd=CallbackCondition(query_string="voting_phase")),
+                Tr(dst=("rules_flow", "night_phase"), cnd=CallbackCondition(query_string="night_phase")),
+                Tr(dst=("rules_flow", "start_and_end"), cnd=CallbackCondition(query_string="start_and_end")),
             ],
         },
     },
@@ -456,14 +454,16 @@ greeting_script = {
                 Tr(dst=("in_room_flow", "not_ready"), cnd=CallbackCondition(query_string="ok")),
             ],
         },
-         "enter_id": {
+        "enter_id": {
             RESPONSE: EnterRoomResponse(),
             TRANSITIONS: [
-                Tr(dst=("join_id"),
-                   cnd=cnd.All(CallbackCondition(query_string="to_random"), RandomRoomExistCondition())),
+                Tr(
+                    dst=("join_id"),
+                    cnd=cnd.All(CallbackCondition(query_string="to_random"), RandomRoomExistCondition()),
+                ),
                 Tr(
                     dst=("random_not_found"),
-                    cnd=cnd.All(CallbackCondition(query_string="to_random"),cnd.Not(RandomRoomExistCondition())),
+                    cnd=cnd.All(CallbackCondition(query_string="to_random"), cnd.Not(RandomRoomExistCondition())),
                 ),
                 Tr(
                     dst=("join_id"),
@@ -473,7 +473,7 @@ greeting_script = {
                     dst="room_not_found",
                     cnd=cnd.All(cnd.Not(CallbackCondition(query_string="to_random")), cnd.Not(RoomExistCondition())),
                 ),
-                Tr(dst="choose", cnd=cnd.ExactMatch("Назад")),
+                Tr(dst="choose", cnd=CallbackCondition(query_string="step_backward")),
             ],
         },
         "random_not_found": {
