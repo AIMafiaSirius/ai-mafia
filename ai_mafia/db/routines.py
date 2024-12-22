@@ -91,14 +91,14 @@ def get_random_room() -> RoomModel | None:
     return RoomModel(**room)
 
 
-def mark_user_as_ready(user_db_id: ObjectId, room_db_id: ObjectId) -> RoomModel:
+def set_player_state(user_db_id: ObjectId, room_db_id: ObjectId, state: str) -> RoomModel:
     """Mark user as ready and return updated room model"""
     room = rooms_collection.find_one({"_id": room_db_id})
     if room is None:
         msg = "Something's wrong. Room not found"
         raise RuntimeError(msg)
     room_model = RoomModel(**room)
-    room_model.change_player_state(user_db_id=str(user_db_id), state="ready")
+    room_model.change_player_state(user_db_id=str(user_db_id), state=state)
     list_players_dict = [player.model_dump() for player in room_model.list_players]
     rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": list_players_dict}})
     return room_model

@@ -35,9 +35,9 @@ from ai_mafia.db.routines import (
     find_user,
     get_random_room,
     join_room,
-    mark_user_as_ready,
     murder,
     send_player_messange,
+    set_player_state,
     shoot,
     start_game,
 )
@@ -300,7 +300,8 @@ class JoinRoomProcessing(BaseProcessing):
     async def call(self, ctx: Context):
         user_info: UserModel = ctx.misc["user_info"]
         room_info: RoomModel = ctx.misc["room_info"]
-        join_room(user_info.db_id, room_info.db_id, ctx.id, ctx.misc["chat_id"])
+        if room_info.get_player(str(user_info.db_id)) in None:
+            join_room(user_info.db_id, room_info.db_id, ctx.id, ctx.misc["chat_id"])
 
 
 class ExitRoomProcessing(BaseProcessing):
@@ -315,11 +316,21 @@ class ExitRoomProcessing(BaseProcessing):
             ctx.misc["room_info"] = None
 
 
+class NotReadyProcessing(BaseProcessing):
+    async def call(self, ctx: Context):
+        upd: tg.Update | None = ctx.last_request.original_message
+        if upd is not None and upd.callback_query.data == "not_ready":
+            user_info: UserModel = ctx.misc["user_info"]
+            room_info: RoomModel = ctx.misc["room_info"]
+            set_player_state(user_info.db_id, room_info.db_id, "not_ready")
+            ctx.misc["room_info"] = find_game_room(room_info.room_id)
+
+
 class CheckReadyProcessing(ModifyResponse):
     async def modified_response(self, original_response: BaseResponse, ctx: Context):
         user_info: UserModel = ctx.misc["user_info"]
         room_info: RoomModel = ctx.misc["room_info"]
-        room = mark_user_as_ready(user_info.db_id, room_info.db_id)
+        room = set_player_state(user_info.db_id, room_info.db_id, "ready")
         if room.is_room_ready(N_PLAYERS):
             send_signal(find_game_room(room_info.room_id), "_ready_")
             return "Мы вас ждали!"
@@ -639,6 +650,7 @@ greeting_script = {
             PRE_TRANSITION: {
                 "get_rules": GetRulesProcessing(from_where=("in_room_flow", "waiting")),
                 "exit_room": ExitRoomProcessing(),
+                "not_ready": NotReadyProcessing(),
             },
             TRANSITIONS: [
                 Tr(dst=("to_room_flow", "choose"), cnd=CallbackCondition(query_string="leave")),

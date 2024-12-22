@@ -80,12 +80,11 @@ class RoomModel(BaseModel):
         ready_count = sum(player.state == "ready" for player in self.list_players)
         return ready_count == n_players_to_wait
 
-    def get_player(self, user_db_id: str) -> PlayerModel:
+    def get_player(self, user_db_id: str) -> PlayerModel | None:
         for player in self.list_players:
             if player.user_id == user_db_id:
                 return player
-        msg = "Something's wrong. Player not found"
-        raise ValueError(msg)
+        return None
 
     def get_cnt_black(self):
         cnt = 0

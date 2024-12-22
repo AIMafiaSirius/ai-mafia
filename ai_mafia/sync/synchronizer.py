@@ -3,7 +3,7 @@ from bson.objectid import ObjectId
 from fastapi import FastAPI
 
 from ai_mafia.config import load_config
-from ai_mafia.db.routines import mark_user_as_ready
+from ai_mafia.db.routines import set_player_state
 
 from .polling import start_polling
 
@@ -14,7 +14,7 @@ config = load_config().sync
 
 @app.post("/player_is_ready")
 async def player_is_ready(user_db_id: str, room_db_id: str, ctx_id: str) -> None:
-    mark_user_as_ready(user_db_id=ObjectId(user_db_id), room_db_id=ObjectId(room_db_id))
+    set_player_state(user_db_id=ObjectId(user_db_id), room_db_id=ObjectId(room_db_id), state="ready")
     await start_polling(ObjectId(room_db_id), ctx_id, interval=1)
 
 
