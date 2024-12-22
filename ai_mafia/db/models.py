@@ -38,6 +38,7 @@ class Player:
 
 RoomState = Literal["created", "started", "ended"]
 
+
 class RoomModel(BaseModel):
     """Data model for storing info about room."""
 

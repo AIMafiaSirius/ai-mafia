@@ -24,6 +24,7 @@ class ChatskyConfig(BaseModel):
     def chat_endpoint(self):
         return self.address + "chat"
 
+
 class AIMafiaConfig(BaseModel):
     db: DBConfig
     chatsky: ChatskyConfig

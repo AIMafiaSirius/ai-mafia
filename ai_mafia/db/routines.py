@@ -85,6 +85,7 @@ def get_random_room() -> RoomModel | None:
     room = random.choice(list_room)
     return RoomModel(**room)
 
+
 # def insert_game_room(game_id, game_name, users):
 #     game_room = {"game_id": game_id, "game_name": game_name, "users": users}
 #     game_rooms_collection.insert_one(game_room)
