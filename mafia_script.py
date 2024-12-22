@@ -37,6 +37,7 @@ from ai_mafia.db.routines import (
     is_murder,
     join_room,
     mark_user_as_ready,
+    send_player_messange,
     shoot,
     start_game,
 )
@@ -329,18 +330,20 @@ class StartGameProcessing(ModifyResponse):
     """Implement game starting logic"""
 
     async def modified_response(self, original_response: BaseResponse, ctx: Context):
-        room_info = find_game_room(ctx.misc["room_info"].room_id)
-        if ctx.id == room_info.list_players[0].ctx_id:
-            start_game(room_info.db_id)
-            send_signal(room_info.room_id)
+        room_info: RoomModel = ctx.misc["room_info"]
+        room = find_game_room(room_info.room_id)
+        if ctx.id == room.list_players[0].ctx_id:
+            start_game(room.db_id)
+            send_signal(room.room_id)
         return await original_response(ctx)
 
 
 class StartGameResponse(BaseResponse):
     async def call(self, ctx: Context) -> MessageInitTypes:
         user_info: UserModel = ctx.misc["user_info"]
-        room_info: RoomModel = find_game_room(ctx.misc["room_info"].room_id)
-        ctx.misc["room_info"] = room_info
+        room_info: RoomModel = ctx.misc["room_info"]
+        room: RoomModel = find_game_room(room_info.room_id)
+        ctx.misc["room_info"] = room
         player_info: PlayerModel = room_info.get_player(str(user_info.db_id))
         return f"""Игра началась!
 Ваш номер: {player_info.number}
@@ -455,6 +458,15 @@ class EndNightResponse(BaseResponse):
             return "В эту ночь мафия никого не убила"
         return f"""В эту ночь мафия убила игрока номер {pre_dead_player.number}
 У игрока {pre_dead_player.number} есть 1 минута на прощальную речь"""
+
+
+class DeadSpeechProcessing(BaseProcessing):
+    async def call(self, ctx: Context):
+        room_info: RoomModel = ctx.misc["room_info"]
+        room = find_game_room(room_info.room_id)
+        player: PlayerModel = room.get_pre_dead_player()
+        if ctx.id == player.ctx_id:
+            send_player_messange(room=room, user_id=player.user_id, msg=ctx.last_request.text)
 
 
 greeting_script = {
@@ -679,12 +691,15 @@ greeting_script = {
             RESPONSE: EndNightResponse(),
             TRANSITIONS: [
                 Tr(dst=("day"), cnd=cnd.ExactMatch("_skip_")),
-                Tr(dst=("pre_dead_speech"), cnd=cnd.ExactMatch("_kill_")),
+                Tr(dst=("dead_speech"), cnd=cnd.ExactMatch("_kill_")),
             ],
         },
-        "pre_dead_speech": {
-            RESPONSE: "",
-            TRANSITIONS: [Tr(dst=("day"), cnd=cnd.ExactMatch("_skip_"))],
+        "dead_speech": {
+            PRE_TRANSITION: {"speech": DeadSpeechProcessing()},
+            TRANSITIONS: [
+                Tr(dst=("day"), cnd=cnd.ExactMatch("_skip_")),
+                Tr(dst=("dead_speech"), cnd=cnd.Not(cnd.ExactMatch("_skip_"))),
+            ],
         },
         "day": {
             RESPONSE: "",

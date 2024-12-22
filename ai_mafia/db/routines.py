@@ -1,9 +1,12 @@
+import asyncio
 import random
 from random import randint
 from uuid import uuid4
 
 from bson.objectid import ObjectId
 from pymongo import MongoClient
+
+from ai_mafia.tg_proxy.chatsky_web_api import send_message
 
 from .models import PlayerModel, RoomModel, UserModel
 from .setup import load_config
@@ -177,3 +180,11 @@ def is_murder(room_id: str) -> bool:
     room = find_game_room(room_id)
     room.kill()
     rooms_collection.update_one({"_id": room.db_id}, {"$set": {"list_players": room.list_players}})
+
+
+def send_player_messange(room: RoomModel, user_id: str, msg: str):
+    coroutines = []
+    for player in room.list_players:
+        if player.user_id != user_id:
+            coroutines.append(send_message(player.ctx_id, player.chat_id, msg))  # noqa: PERF401
+    [asyncio.create_task(coro) for coro in coroutines]
