@@ -290,23 +290,23 @@ class CheckReadyProcessing(ModifyResponse):
         return await original_response(ctx)
 
 
-class StartGameProcessing(BaseProcessing):
+class StartGameProcessing(ModifyResponse):
     """Implement game starting logic"""
 
-    async def call(self, ctx: Context):
-        room_info: RoomModel = ctx.misc["room_info"]
-        user_info: UserModel = ctx.misc["user_info"]
-        room: RoomModel = find_game_room(room_info.room_id)
-        if room.room_state == "created":
+    async def modified_response(self, original_response: BaseResponse, ctx: Context):
+        room_info = find_game_room(ctx.misc["room_info"].room_id)
+        if ctx.id == room_info.list_players[0].ctx_id:
             start_game(room_info.db_id)
-            room = find_game_room(room_info.room_id)
-        ctx.misc["room_info"] = room
-        ctx.misc["player_info"] = room.get_player(str(user_info.db_id))
+            send_signal(room_info.room_id)
+        return await original_response(ctx)
 
 
 class StartGameResponse(BaseResponse):
     async def call(self, ctx: Context) -> MessageInitTypes:
-        player_info: PlayerModel = ctx.misc["player_info"]
+        user_info: UserModel = ctx.misc["user_info"]
+        room_info: RoomModel = find_game_room(ctx.misc["room_info"].room_id)
+        ctx.misc["room_info"] = room_info
+        player_info: PlayerModel = room_info.get_player(str(user_info.db_id))
         return f"""Игра началась!
 Ваш номер: {player_info.number}
 Ваша роль: {player_info.role}"""
@@ -318,7 +318,9 @@ with open("game_rules.json", encoding="utf8") as file:  # noqa: PTH123
 
 class ShootingResponse(BaseResponse):
     async def call(self, ctx: Context):
-        player_info: PlayerModel = ctx.misc["player_info"]
+        user_info: UserModel = ctx.misc["user_info"]
+        room_info: RoomModel = ctx.misc["room_info"]
+        player_info: PlayerModel = room_info.get_player(str(user_info.db_id))
         if player_info.role in ("мафия", "дон") and player_info.state == "alive":
             return "Наступает ночь! Напишите номер игрока, в которого будете стрелять"
         return "Наступает ночь! Мафия выбирает, кого убить"
@@ -328,7 +330,9 @@ class ShootingProcessing(BaseProcessing):
     """Implement shooting logic"""
 
     async def call(self, ctx: Context):
-        player_info: PlayerModel = ctx.misc["player_info"]
+        user_info: UserModel = ctx.misc["user_info"]
+        room_info: RoomModel = ctx.misc["room_info"]
+        player_info: PlayerModel = room_info.get_player(str(user_info.db_id))
         request = ctx.last_request.text
         if player_info.role in ("мафия", "дон") and request in NUM_PLAYERS:
             shoot(room_db_id=ctx.misc["room_info"].db_id, i=int(request) - 1)
@@ -336,7 +340,9 @@ class ShootingProcessing(BaseProcessing):
 
 class CheckResponse(BaseResponse):
     async def call(self, ctx: Context):
-        player_info: PlayerModel = ctx.misc["player_info"]
+        user_info: UserModel = ctx.misc["user_info"]
+        room_info: RoomModel = ctx.misc["room_info"]
+        player_info: PlayerModel = room_info.get_player(str(user_info.db_id))
         if player_info.role == "комиссар" and player_info.state == "alive":
             return "Вы - комиссар. Напишите номер игрока, которого хотите проверить"
         if player_info.role == "дон" and player_info.state == "alive":
@@ -346,12 +352,18 @@ class CheckResponse(BaseResponse):
 
 class IsCom(BaseCondition):
     async def call(self, ctx: Context) -> bool:
-        return ctx.misc["player_info"].role == "комиссар"
+        user_info: UserModel = ctx.misc["user_info"]
+        room_info: RoomModel = ctx.misc["room_info"]
+        player_info: PlayerModel = room_info.get_player(str(user_info.db_id))
+        return player_info.role == "комиссар"
 
 
 class IsDon(BaseCondition):
     async def call(self, ctx: Context) -> bool:
-        return ctx.misc["player_info"].role == "дон"
+        user_info: UserModel = ctx.misc["user_info"]
+        room_info: RoomModel = ctx.misc["room_info"]
+        player_info: PlayerModel = room_info.get_player(str(user_info.db_id))
+        return player_info.role == "дон"
 
 
 class ComsCheckResponse(BaseResponse):
@@ -381,11 +393,13 @@ class EndNightResponse(BaseResponse):
         room_info: RoomModel = ctx.misc["room_info"]
         room = find_game_room(room_info.room_id)
         mafia_cnt = room.get_cnt_black()
+        response = "В эту ночь мафия никого не убила"
         for player in room.list_players:
             if player.shoot_cnt == mafia_cnt and player.state == "alive":
                 room.change_player_state(player.user_id, "dead")
-                return ""
-        return ""
+                response = f"В эту ночь мафия убила игрока номер {player.number}"
+            player.shoot_cnt = 0
+        return response
 
 
 greeting_script = {
