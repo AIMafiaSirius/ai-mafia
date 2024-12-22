@@ -68,8 +68,8 @@ class NewRoomResponse(BaseResponse):
         keyboard = InlineKeyboardMarkup(
             [
                 [
-                    InlineKeyboardButton("Да", callback_data="ok"),
-                    InlineKeyboardButton("Назад", callback_data="step_backward")
+                    InlineKeyboardButton("✅ Да", callback_data="ok"),
+                    InlineKeyboardButton("⬅️ Назад", callback_data="step_backward")
                 ]
             ]
         )
@@ -83,8 +83,8 @@ class JoinRoomResponse(BaseResponse):
         keyboard = InlineKeyboardMarkup(
             [
                 [
-                    InlineKeyboardButton("Назад", callback_data="step_backward"),
-                    InlineKeyboardButton("Да", callback_data="join"),
+                    InlineKeyboardButton("⬅️ Назад", callback_data="step_backward"),
+                    InlineKeyboardButton("✅ Да", callback_data="join"),
                 ]
             ]
         )
@@ -146,8 +146,8 @@ class GreetingResponse(BaseResponse):
         keyboard = InlineKeyboardMarkup(
             [
                 [
-                    InlineKeyboardButton("Да", callback_data="instr_yes"),
-                    InlineKeyboardButton("Нет", callback_data="instr_no"),
+                    InlineKeyboardButton("✅ Да", callback_data="instr_yes"),
+                    InlineKeyboardButton("❌ Нет", callback_data="instr_no"),
                 ]
             ]
         )
@@ -158,21 +158,21 @@ class ShowRulesResponse(BaseResponse):
         keyboard = InlineKeyboardMarkup(
             [
                 [
-                    InlineKeyboardButton("Полные правила", callback_data="full_rules"),
+                    InlineKeyboardButton("📝 Полные правила", callback_data="full_rules"),
                 ],
                 [
-                    InlineKeyboardButton("Роли", callback_data="game_roles"),
+                    InlineKeyboardButton("🎭 Роли", callback_data="game_roles"),
                 ],
                 [
-                    InlineKeyboardButton("Ход дня", callback_data="day_phase"),
-                    InlineKeyboardButton("Ход голосования", callback_data="voting_phase"),
-                    InlineKeyboardButton("Ход ночи", callback_data="night_phase"),
+                    InlineKeyboardButton("🌅 День", callback_data="day_phase"),
+                    InlineKeyboardButton("🗣️ Голосование", callback_data="voting_phase"),
+                    InlineKeyboardButton("🌃 Ночь", callback_data="night_phase"),
                 ],
                 [
-                    InlineKeyboardButton("Начало и конец игры", callback_data="start_and_end")
+                    InlineKeyboardButton("🕹️ Начало и конец игры", callback_data="start_and_end")
                 ],
                 [
-                    InlineKeyboardButton("Вернуться к игре", callback_data="step_backward"),
+                    InlineKeyboardButton("⬅️ Вернуться к игре", callback_data="step_backward"),
                 ]
             ]
         )
@@ -186,7 +186,7 @@ class RuleResponse(BaseResponse):
         keyboard = InlineKeyboardMarkup(
             [
                 [
-                    InlineKeyboardButton("Назад", callback_data="step_backward")
+                    InlineKeyboardButton("⬅️ Назад", callback_data="step_backward")
                 ]
             ]
         )
@@ -226,8 +226,8 @@ class ChooseRoomResponse(BaseResponse):
         keyboard = InlineKeyboardMarkup(
             [
                 [
-                    InlineKeyboardButton("Создать", callback_data="create_room"),
-                    InlineKeyboardButton("Присоединиться", callback_data="join_room")
+                    InlineKeyboardButton("⚙️ Создать", callback_data="create_room"),
+                    InlineKeyboardButton("🚪 Присоединиться", callback_data="join_room")
                 ]
             ]
         )
@@ -239,8 +239,8 @@ class AreYouReadyResponse(BaseResponse):
         keyboard = InlineKeyboardMarkup(
             [
                 [
-                    InlineKeyboardButton("Выйти", callback_data="leave"),
-                    InlineKeyboardButton("Готов", callback_data="ready")
+                    InlineKeyboardButton("🚪 Выйти", callback_data="leave"),
+                    InlineKeyboardButton("✅ Готов", callback_data="ready")
                 ]
             ]
         )
@@ -253,7 +253,10 @@ class EnterRoomResponse(BaseResponse):
         keyboard = InlineKeyboardMarkup(
             [
                 [
-                    InlineKeyboardButton("К случайной", callback_data="to_random"),
+                    InlineKeyboardButton("🎲 К случайной", callback_data="to_random"),
+                ],
+                [
+                    InlineKeyboardButton("⬅️ Назад", callback_data="step_backward")
                 ]
             ]
         )
@@ -265,7 +268,7 @@ class RoomNotFoundResponse(BaseResponse):
         keyboard = InlineKeyboardMarkup(
             [
                 [
-                    InlineKeyboardButton("Назад", callback_data="step_backward"),
+                    InlineKeyboardButton("⬅️ Назад", callback_data="step_backward"),
                 ]
             ]
         )
@@ -277,8 +280,8 @@ class RandomNotFoundResponse(BaseResponse):
         keyboard = InlineKeyboardMarkup(
             [
                 [
-                    InlineKeyboardButton("Да", callback_data="create"),
-                    InlineKeyboardButton("Назад", callback_data="step_backward")
+                    InlineKeyboardButton("✅ Да", callback_data="create"),
+                    InlineKeyboardButton("⬅️ Назад", callback_data="step_backward")
                 ]
             ]
         )
@@ -290,7 +293,7 @@ class WaitingStartResponse(BaseResponse):
         keyboard = InlineKeyboardMarkup(
             [
                 [
-                    InlineKeyboardButton("Выйти", callback_data="leave")
+                    InlineKeyboardButton("🚪 Выйти", callback_data="leave")
                 ]
             ]
         )
@@ -302,7 +305,7 @@ class FallBackResponse(BaseResponse):
         keyboard = InlineKeyboardMarkup(
             [
                 [
-                    InlineKeyboardButton("Назад", callback_data="step_backward")
+                    InlineKeyboardButton("⬅️ Назад", callback_data="step_backward")
                 ]
             ]
         )
@@ -425,7 +428,7 @@ greeting_script = {
                     dst="room_not_found",
                     cnd=cnd.All(cnd.Not(CallbackCondition(query_string="to_random")), cnd.Not(RoomExistCondition())),
                 ),
-                Tr(dst="choose", cnd=cnd.ExactMatch("Назад")),
+                Tr(dst="choose", cnd=CallbackCondition(query_string="step_backward")),
             ],
         },
         "random_not_found": {
