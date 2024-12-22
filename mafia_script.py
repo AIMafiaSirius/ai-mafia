@@ -300,7 +300,7 @@ class JoinRoomProcessing(BaseProcessing):
     async def call(self, ctx: Context):
         user_info: UserModel = ctx.misc["user_info"]
         room_info: RoomModel = ctx.misc["room_info"]
-        if room_info.get_player(str(user_info.db_id)) in None:
+        if room_info.get_player(str(user_info.db_id)) is None:
             join_room(user_info.db_id, room_info.db_id, ctx.id, ctx.misc["chat_id"])
 
 
