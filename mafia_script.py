@@ -644,11 +644,11 @@ greeting_script = {
                 Tr(dst=("to_room_flow", "choose"), cnd=CallbackCondition(query_string="leave")),
                 Tr(dst="not_ready", cnd=CallbackCondition(query_string="not_ready")),
                 Tr(dst=("rules_flow", "get_rules"), cnd=CallbackCondition(query_string="get_rules")),
-                Tr(dst=("in_game", "start_node"), cnd=cnd.ExactMatch("_ready_")),
+                Tr(dst=("in_game_flow", "start_node"), cnd=cnd.ExactMatch("_ready_")),
             ],
         },
     },
-    "in_game": {
+    "in_game_flow": {
         "fallback_node": {
             RESPONSE: "Пожалуйста, дождитесь оставшихся игроков",
             TRANSITIONS: [Tr(dst=dst.Previous())],

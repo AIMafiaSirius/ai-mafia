@@ -32,7 +32,7 @@ async def respond(
 
 
 async def send_message(ctx_id: str, chat_id: int, msg: str):
-    await asyncio.sleep(3)
+    await asyncio.sleep(4)
     context = await interface.on_request_async(Message(text=msg), ctx_id)
     await bot.send_message(chat_id=chat_id, text=context.last_response.text)
 
