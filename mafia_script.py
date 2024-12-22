@@ -699,6 +699,7 @@ greeting_script = {
             ],
         },
         "dead_speech": {
+            RESPONSE: "",
             PRE_TRANSITION: {"speech": DeadSpeechProcessing()},
             TRANSITIONS: [
                 Tr(dst=("day"), cnd=cnd.ExactMatch("_skip_")),
