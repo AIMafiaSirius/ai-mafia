@@ -164,3 +164,10 @@ def start_game(room_db_id: ObjectId):
         lst_players[i]["role"] = lst_role[i]
         lst_players[i]["number"] = i + 1
     rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": lst_players, "room_state": "started"}})
+
+
+def shoot(room_db_id: ObjectId, i: int):
+    room = rooms_collection.find_one({"_id": room_db_id})
+    lst_players: list = room["list_players"]
+    lst_players[i].shoot_cnt += 1
+    rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": lst_players}})

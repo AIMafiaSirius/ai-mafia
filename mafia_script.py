@@ -23,7 +23,7 @@ from dotenv import load_dotenv
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from ai_mafia.config import load_config
-from ai_mafia.constants import N_PLAYERS
+from ai_mafia.constants import N_PLAYERS, NUM_PLAYERS
 from ai_mafia.db.models import RoomModel
 from ai_mafia.db.routines import (
     add_room,
@@ -34,6 +34,7 @@ from ai_mafia.db.routines import (
     get_random_room,
     join_room,
     mark_user_as_ready,
+    shoot,
     start_game,
 )
 from ai_mafia.tg_proxy import chatsky_web_api, chatsky_web_interface, send_room_is_ready_signal
@@ -251,8 +252,8 @@ class CallbackCondition(BaseCondition):
     query_string: str
 
     async def call(self, ctx: Context):
-        upd: tg.Update = ctx.last_request.original_message
-        if upd.callback_query is None:
+        upd: tg.Update | None = ctx.last_request.original_message
+        if upd is None or upd.callback_query is None:
             return False
         return upd.callback_query.data == self.query_string
 
@@ -270,8 +271,8 @@ class ExitRoomProcessing(BaseProcessing):
     """Implement room exiting logic"""
 
     async def call(self, ctx: Context):
-        upd: tg.Update = ctx.last_request.original_message
-        if upd.callback_query.data == "leave":
+        upd: tg.Update | None = ctx.last_request.original_message
+        if upd is not None and upd.callback_query.data == "leave":
             user_info: UserModel = ctx.misc["user_info"]
             room_info: RoomModel = ctx.misc["room_info"]
             exit_room(user_info.db_id, room_info.db_id)
@@ -323,6 +324,16 @@ class ShootingResponse(BaseResponse):
         return "Наступает ночь! Мафия выбирает, кого убить"
 
 
+class ShootingProcessing(BaseProcessing):
+    """Implement shooting logic"""
+
+    async def call(self, ctx: Context):
+        player_info: PlayerModel = ctx.misc["player_info"]
+        request = ctx.last_request.text
+        if player_info.role in ("мафия", "дон") and request in NUM_PLAYERS:
+            shoot(room_db_id=ctx.misc["room_info"].db_id, i=int(request) - 1)
+
+
 class CheckResponse(BaseResponse):
     async def call(self, ctx: Context):
         player_info: PlayerModel = ctx.misc["player_info"]
@@ -335,35 +346,46 @@ class CheckResponse(BaseResponse):
 
 class IsCom(BaseCondition):
     async def call(self, ctx: Context) -> bool:
-        return ctx["player_info"].role == "комиссар"
+        return ctx.misc["player_info"].role == "комиссар"
 
 
 class IsDon(BaseCondition):
     async def call(self, ctx: Context) -> bool:
-        return ctx["player_info"].role == "дон"
+        return ctx.misc["player_info"].role == "дон"
 
 
 class ComsCheckResponse(BaseResponse):
     async def call(self, ctx: Context):
-        request = ctx.last_request
-        num = int(request.text)
-        role = ctx.misc["room_info"].list_players[num - 1]["role"]
-        color = role in ("мафия", "дон") if "чёрный" else "красный"
-        return f"Этот игрок {color}"
+        request = ctx.last_request.text
+        if request in NUM_PLAYERS:
+            num = int(request)
+            role = ctx.misc["room_info"].list_players[num - 1].role
+            color = role in ("мафия", "дон") if "чёрный" else "красный"
+            return f"Этот игрок {color}"
+        return "Напишите номер игрока, которого хотите проверить"
 
 
 class DonsCheckResponse(BaseResponse):
     async def call(self, ctx: Context):
-        request = ctx.last_request
-        num = int(request.text)
-        role = ctx.misc["room_info"].list_players[num - 1]["role"]
-        is_com = role == "комиссар" if "комиссар" else "не комиссар"
-        return f"Этот игрок {is_com}"
+        request = ctx.last_request.text
+        if request in NUM_PLAYERS:
+            num = int(request)
+            role = ctx.misc["room_info"].list_players[num - 1].role
+            is_com = role == "комиссар" if "комиссар" else "не комиссар"
+            return f"Этот игрок {is_com}"
+        return "Напишите номер игрока, которого хотите проверить"
 
 
-class MafiaChoiceCheck(BaseProcessing):
-    def call(self, ctx: Context):
-        pass
+class EndNightResponse(BaseResponse):
+    async def call(self, ctx: Context):
+        room_info: RoomModel = ctx.misc["room_info"]
+        room = find_game_room(room_info.room_id)
+        mafia_cnt = room.get_cnt_black()
+        for player in room.list_players:
+            if player.shoot_cnt == mafia_cnt and player.state == "alive":
+                room.change_player_state(player.user_id, "dead")
+                return ""
+        return ""
 
 
 greeting_script = {
@@ -524,6 +546,7 @@ greeting_script = {
         },
         "shooting_phase": {
             RESPONSE: ShootingResponse(),
+            PRE_TRANSITION: {"shoot": ShootingProcessing()},
             TRANSITIONS: [Tr(dst=("checks_phase"))],
         },
         "checks_phase": {
@@ -539,7 +562,7 @@ greeting_script = {
             TRANSITIONS: [Tr(dst=("end_of_night"))],
         },
         "end_of_night": {
-            RESPONSE: "",
+            RESPONSE: "...",
         },
     },
 }

@@ -40,6 +40,8 @@ class PlayerModel(BaseModel):
 
     chat_id: int
 
+    shoot_cnt: int = 0
+
 
 RoomState = Literal["created", "started", "ended"]
 
