@@ -30,7 +30,6 @@ class ChatskyConfig(EndpointConfig): ...
 class SynchronizerConfig(EndpointConfig): ...
 
 
-
 class AIMafiaConfig(BaseModel):
     db: DBConfig
     chatsky: ChatskyConfig
