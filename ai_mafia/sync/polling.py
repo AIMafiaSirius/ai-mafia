@@ -3,7 +3,7 @@ import asyncio
 from bson.objectid import ObjectId
 
 from ai_mafia.db.routines import is_room_ready
-from ai_mafia.tg_proxy import send_room_is_ready_signal
+from ai_mafia.tg_proxy import send_signal
 
 
 async def check_database(room_db_id: ObjectId):
@@ -17,7 +17,7 @@ async def poll_database(room_db_id: ObjectId, ctx_id: str, interval: float):
         print(f"Database check result: {result}")
         if result:
             print("polling ended")
-            send_room_is_ready_signal(ctx_id)
+            send_signal(ctx_id)
             break
         await asyncio.sleep(interval)
 
