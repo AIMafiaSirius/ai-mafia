@@ -24,7 +24,7 @@ class UserModel(BaseModel):
     """Total number of played games from this user from all his sessions."""
 
 
-PlayerState = Literal["not_ready", "ready", "alive", "dead"]
+PlayerState = Literal["not_ready", "ready", "alive", "pre_dead", "dead"]
 
 
 class PlayerModel(BaseModel):
@@ -93,3 +93,16 @@ class RoomModel(BaseModel):
             if player.state == "alive" and player.role in ("мафия", "дон"):
                 cnt += 1
         return cnt
+
+    def kill(self):
+        shoot_cnt = self.get_cnt_black()
+        for player in self.list_players:
+            if player.shoot_cnt == shoot_cnt:
+                player.state = "pre_dead"
+            player.shoot_cnt = 0
+
+    def get_pre_dead_player(self) -> PlayerModel | None:
+        for player in self.list_players:
+            if player.state == "pre_dead":
+                return player
+        return None

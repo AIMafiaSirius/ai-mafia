@@ -169,5 +169,11 @@ def start_game(room_db_id: ObjectId):
 def shoot(room_db_id: ObjectId, i: int):
     room = rooms_collection.find_one({"_id": room_db_id})
     lst_players: list = room["list_players"]
-    lst_players[i].shoot_cnt += 1
+    lst_players[i]["shoot_cnt"] += 1
     rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": lst_players}})
+
+
+def is_murder(room_id: str) -> bool:
+    room = find_game_room(room_id)
+    room.kill()
+    rooms_collection.update_one({"_id": room.db_id}, {"$set": {"list_players": room.list_players}})
