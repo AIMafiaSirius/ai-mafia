@@ -11,6 +11,7 @@ from chatsky import (
     RESPONSE,
     TRANSITIONS,
     BaseCondition,
+    BaseDestination,
     BaseProcessing,
     BaseResponse,
     Context,
@@ -146,7 +147,7 @@ class GreetingResponse(BaseResponse):
         keyboard = InlineKeyboardMarkup(
             [
                 [
-                    InlineKeyboardButton("✅ Да", callback_data="instr_yes"),
+                    InlineKeyboardButton("✅ Да", callback_data="get_rules"),
                     InlineKeyboardButton("❌ Нет", callback_data="instr_no"),
                 ]
             ]
@@ -171,7 +172,7 @@ class ShowRulesResponse(BaseResponse):
                 ],
                 [InlineKeyboardButton("🕹️ Начало и конец игры", callback_data="start_and_end")],
                 [
-                    InlineKeyboardButton("⬅️ Вернуться к игре", callback_data="step_backward"),
+                    InlineKeyboardButton("⬅️ Назад", callback_data="step_backward"),
                 ],
             ]
         )
@@ -193,6 +194,17 @@ class JoinRoomProcessing(BaseProcessing):
         user_info: UserModel = ctx.misc["user_info"]
         room_info: RoomModel = ctx.misc["room_info"]
         join_room(user_info.db_id, room_info.db_id, ctx.id, ctx.misc["chat_id"])
+
+
+class GetRulesProcessing(BaseProcessing):
+    """Implement get_rules button logic"""
+
+    from_where: tuple
+
+    async def call(self, ctx: Context):
+        upd: tg.Update = ctx.last_request.original_message
+        if upd.callback_query.data == "get_rules":
+            ctx.misc["from_where"] = self.from_where
 
 
 class ExitRoomProcessing(BaseProcessing):
@@ -219,10 +231,11 @@ class ChooseRoomResponse(BaseResponse):
     async def call(self, _: Context):
         keyboard = InlineKeyboardMarkup(
             [
+                [InlineKeyboardButton("📝 Правила игры", callback_data="get_rules")],
                 [
                     InlineKeyboardButton("⚙️ Создать", callback_data="create_room"),
                     InlineKeyboardButton("🚪 Присоединиться", callback_data="join_room"),
-                ]
+                ],
             ]
         )
         return Message(text="Вы хотите присоединться к комнате или создать новую?", reply_markup=keyboard)
@@ -232,10 +245,11 @@ class AreYouReadyResponse(BaseResponse):
     async def call(self, _: Context):
         keyboard = InlineKeyboardMarkup(
             [
+                [InlineKeyboardButton("📝 Правила игры", callback_data="get_rules")],
                 [
                     InlineKeyboardButton("🚪 Выйти", callback_data="leave"),
                     InlineKeyboardButton("✅ Готов", callback_data="ready"),
-                ]
+                ],
             ]
         )
         text = 'Вы присоединились к комнате. Нажмите на кнопку "готов", когда будете готовы начать игру.'
@@ -282,7 +296,15 @@ class RandomNotFoundResponse(BaseResponse):
 
 class WaitingStartResponse(BaseResponse):
     async def call(self, _: Context):
-        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🚪 Выйти", callback_data="leave")]])
+        keyboard = InlineKeyboardMarkup(
+            [
+                [InlineKeyboardButton("📝 Правила игры", callback_data="get_rules")],
+                [
+                    InlineKeyboardButton("🚪 Выйти", callback_data="leave"),
+                    InlineKeyboardButton("❌ Не готов", callback_data="not_ready"),
+                ],
+            ]
+        )
         return Message(text="Пожалуйста, ожидайте начала игры", reply_markup=keyboard)
 
 
@@ -290,6 +312,12 @@ class FallBackResponse(BaseResponse):
     async def call(self, _: Context):
         keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Назад", callback_data="step_backward")]])
         return Message(text="К сожалению, я не могу обработать эту команду", reply_markup=keyboard)
+
+
+class CreateRoomResponse(BaseResponse):
+    async def call(self, _: Context):
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Назад", callback_data="step_backward")]])
+        return Message(text="Введите название для комнаты", reply_markup=keyboard)
 
 
 with open("game_rules.json", encoding="utf8") as file:  # noqa: PTH123
@@ -302,11 +330,16 @@ class FallbackResponse(BaseResponse):
         return f"К сожалению, я не могу обработать команду: {txt}"
 
 
+class FromRulesDestination(BaseDestination):
+    async def call(self, ctx: Context):
+        return ctx.misc["from_where"]
+
+
 greeting_script = {
     "global_flow": {
         "fallback_node": {
             RESPONSE: FallBackResponse(),
-            TRANSITIONS: [Tr(dst=dst.Previous(), cnd=CallbackCondition(query_string="step_backward"))],
+            TRANSITIONS: [Tr(dst=dst.Previous())],
         },
     },
     "greeting_flow": {
@@ -316,73 +349,79 @@ greeting_script = {
         },
         "greeting_node": {
             RESPONSE: GreetingResponse(),
+            PRE_TRANSITION: {"get_rules": GetRulesProcessing(from_where=("greeting_flow", "greeting_node"))},
             TRANSITIONS: [
-                Tr(dst=("get_rules"), cnd=CallbackCondition(query_string="instr_yes")),
+                Tr(dst=("rules_flow", "get_rules"), cnd=CallbackCondition(query_string="get_rules")),
                 Tr(dst=("to_room_flow", "choose"), cnd=CallbackCondition(query_string="instr_no")),
-            ],
-        },
-        "get_rules": {
-            RESPONSE: ShowRulesResponse(),
-            TRANSITIONS: [
-                Tr(dst=("to_room_flow", "choose"), cnd=CallbackCondition(query_string="step_backward")),
-                Tr(dst=("rules_flow", "game_rules"), cnd=CallbackCondition(query_string="full_rules")),
-                Tr(dst=("rules_flow", "game_roles"), cnd=CallbackCondition(query_string="roles")),
-                Tr(dst=("rules_flow", "day_phase"), cnd=CallbackCondition(query_string="day_phase")),
-                Tr(dst=("rules_flow", "voting_phase"), cnd=CallbackCondition(query_string="voting_phase")),
-                Tr(dst=("rules_flow", "night_phase"), cnd=CallbackCondition(query_string="night_phase")),
-                Tr(dst=("rules_flow", "start_and_end"), cnd=CallbackCondition(query_string="start_and_end")),
             ],
         },
     },
     "rules_flow": {
-        "game_rules": {
+        "get_rules": {
+            RESPONSE: ShowRulesResponse(),
+            TRANSITIONS: [
+                Tr(dst=FromRulesDestination(), cnd=CallbackCondition(query_string="step_backward")),
+                Tr(dst="full_rules", cnd=CallbackCondition(query_string="full_rules")),
+                Tr(dst="game_roles", cnd=CallbackCondition(query_string="game_roles")),
+                Tr(dst="day_phase", cnd=CallbackCondition(query_string="day_phase")),
+                Tr(dst="voting_phase", cnd=CallbackCondition(query_string="voting_phase")),
+                Tr(dst="night_phase", cnd=CallbackCondition(query_string="night_phase")),
+                Tr(dst="start_and_end", cnd=CallbackCondition(query_string="start_and_end")),
+            ],
+        },
+        "full_rules": {
             RESPONSE: RuleResponse(name="full_rules"),
             TRANSITIONS: [
-                Tr(dst=("greeting_flow", "get_rules"), cnd=CallbackCondition(query_string="step_backward")),
+                Tr(dst=dst.Previous(), cnd=CallbackCondition(query_string="step_backward")),
             ],
         },
         "game_roles": {
             RESPONSE: RuleResponse(name="roles"),
             TRANSITIONS: [
-                Tr(dst=("greeting_flow", "get_rules"), cnd=CallbackCondition(query_string="step_backward")),
+                Tr(dst=dst.Previous(), cnd=CallbackCondition(query_string="step_backward")),
             ],
         },
         "day_phase": {
             RESPONSE: RuleResponse(name="day"),
             TRANSITIONS: [
-                Tr(dst=("greeting_flow", "get_rules"), cnd=CallbackCondition(query_string="step_backward")),
+                Tr(dst=dst.Previous(), cnd=CallbackCondition(query_string="step_backward")),
             ],
         },
         "voting_phase": {
             RESPONSE: RuleResponse(name="voting"),
             TRANSITIONS: [
-                Tr(dst=("greeting_flow", "get_rules"), cnd=CallbackCondition(query_string="step_backward")),
+                Tr(dst=dst.Previous(), cnd=CallbackCondition(query_string="step_backward")),
             ],
         },
         "night_phase": {
             RESPONSE: RuleResponse(name="night"),
             TRANSITIONS: [
-                Tr(dst=("greeting_flow", "get_rules"), cnd=CallbackCondition(query_string="step_backward")),
+                Tr(dst=dst.Previous(), cnd=CallbackCondition(query_string="step_backward")),
             ],
         },
         "start_and_end": {
             RESPONSE: RuleResponse(name="game_start_and_end"),
             TRANSITIONS: [
-                Tr(dst=("greeting_flow", "get_rules"), cnd=CallbackCondition(query_string="step_backward")),
+                Tr(dst=dst.Previous(), cnd=CallbackCondition(query_string="step_backward")),
             ],
         },
     },
     "to_room_flow": {
         "choose": {
             RESPONSE: ChooseRoomResponse(),
+            PRE_TRANSITION: {"get_rules": GetRulesProcessing(from_where=("to_room_flow", "choose"))},
             TRANSITIONS: [
                 Tr(dst=("enter_id"), cnd=CallbackCondition(query_string="join_room")),
                 Tr(dst=("make"), cnd=CallbackCondition(query_string="create_room")),
+                Tr(dst=("rules_flow", "get_rules"), cnd=CallbackCondition(query_string="get_rules")),
             ],
         },
         "make": {
-            RESPONSE: "Введите название для комнаты",
-            TRANSITIONS: [Tr(dst=("new"))],
+            RESPONSE: CreateRoomResponse(),
+            TRANSITIONS: [
+                Tr(dst=("new"), cnd=cnd.Not(CallbackCondition(query_string="step_backward"))),
+                Tr(dst=dst.Previous(), cnd=CallbackCondition(query_string="step_backward")),
+            ],
         },
         "new": {
             RESPONSE: NewRoomResponse(),
@@ -404,11 +443,21 @@ greeting_script = {
                 ),
                 Tr(
                     dst=("join_id"),
-                    cnd=cnd.All(cnd.Not(CallbackCondition(query_string="to_random")), RoomExistCondition()),
+                    cnd=cnd.All(
+                        cnd.All(
+                            cnd.Not(CallbackCondition(query_string="to_random")),
+                            cnd.Not(CallbackCondition(query_string="step_backward")),
+                        ),
+                        RoomExistCondition(),
+                    ),
                 ),
                 Tr(
                     dst="room_not_found",
-                    cnd=cnd.All(cnd.Not(CallbackCondition(query_string="to_random")), cnd.Not(RoomExistCondition())),
+                    cnd=cnd.All(
+                        cnd.Not(CallbackCondition(query_string="to_random")),
+                        cnd.Not(CallbackCondition(query_string="step_backward")),
+                        cnd.Not(RoomExistCondition()),
+                    ),
                 ),
                 Tr(dst="choose", cnd=CallbackCondition(query_string="step_backward")),
             ],
@@ -423,7 +472,7 @@ greeting_script = {
         "join_id": {
             RESPONSE: JoinRoomResponse(),
             TRANSITIONS: [
-                Tr(dst="choose", cnd=CallbackCondition(query_string="step_backward")),
+                Tr(dst=dst.Previous(), cnd=CallbackCondition(query_string="step_backward")),
                 Tr(dst=("in_room_flow", "not_ready"), cnd=CallbackCondition(query_string="join")),
             ],
         },
@@ -436,18 +485,27 @@ greeting_script = {
         "not_ready": {
             PRE_RESPONSE: {"join_room": JoinRoomProcessing()},
             RESPONSE: AreYouReadyResponse(),
-            PRE_TRANSITION: {"exit_room": ExitRoomProcessing()},
+            PRE_TRANSITION: {
+                "get_rules": GetRulesProcessing(from_where=("in_room_flow", "not_ready")),
+                "exit_room": ExitRoomProcessing(),
+            },
             TRANSITIONS: [
                 Tr(dst=("waiting"), cnd=CallbackCondition(query_string="ready")),
                 Tr(dst=("to_room_flow", "choose"), cnd=CallbackCondition(query_string="leave")),
+                Tr(dst=("rules_flow", "get_rules"), cnd=CallbackCondition(query_string="get_rules")),
             ],
         },
         "waiting": {
             PRE_RESPONSE: {"call_syncronizer": CheckReadyProcessing()},
             RESPONSE: WaitingStartResponse(),
-            PRE_TRANSITION: {"exit_room": ExitRoomProcessing()},
+            PRE_TRANSITION: {
+                "get_rules": GetRulesProcessing(from_where=("in_room_flow", "waiting")),
+                "exit_room": ExitRoomProcessing(),
+            },
             TRANSITIONS: [
                 Tr(dst=("to_room_flow", "choose"), cnd=CallbackCondition(query_string="leave")),
+                Tr(dst="not_ready", cnd=CallbackCondition(query_string="not_ready")),
+                Tr(dst=("rules_flow", "get_rules"), cnd=CallbackCondition(query_string="get_rules")),
                 Tr(dst=("in_game", "start_node"), cnd=cnd.ExactMatch("_ready_")),
             ],
         },
