@@ -32,8 +32,9 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
         else:
             query = update.callback_query
             await query.answer()
-            await context.bot.edit_message_text(chat_id=query.message.chat_id, text=msg.text, reply_markup=keyboard,
-                                                message_id=query.message.message_id)
+            await context.bot.edit_message_text(
+                chat_id=query.message.chat_id, text=msg.text, reply_markup=keyboard, message_id=query.message.message_id
+            )
     except requests.exceptions.RequestException as e:
         logger.exception("Error sending message to HTTP endpoint: %s", str(e))  # noqa: TRY401
         if update.callback_query is None:

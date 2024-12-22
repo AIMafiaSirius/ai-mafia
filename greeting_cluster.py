@@ -198,6 +198,7 @@ class JoinRoomProcessing(BaseProcessing):
 
 class GetRulesProcessing(BaseProcessing):
     """Implement get_rules button logic"""
+
     from_where: tuple
 
     async def call(self, ctx: Context):
@@ -230,13 +231,11 @@ class ChooseRoomResponse(BaseResponse):
     async def call(self, _: Context):
         keyboard = InlineKeyboardMarkup(
             [
-                [
-                    InlineKeyboardButton("📝 Правила игры", callback_data="get_rules")
-                ],
+                [InlineKeyboardButton("📝 Правила игры", callback_data="get_rules")],
                 [
                     InlineKeyboardButton("⚙️ Создать", callback_data="create_room"),
                     InlineKeyboardButton("🚪 Присоединиться", callback_data="join_room"),
-                ]
+                ],
             ]
         )
         return Message(text="Вы хотите присоединться к комнате или создать новую?", reply_markup=keyboard)
@@ -246,13 +245,11 @@ class AreYouReadyResponse(BaseResponse):
     async def call(self, _: Context):
         keyboard = InlineKeyboardMarkup(
             [
-                [
-                    InlineKeyboardButton("📝 Правила игры", callback_data="get_rules")
-                ],
+                [InlineKeyboardButton("📝 Правила игры", callback_data="get_rules")],
                 [
                     InlineKeyboardButton("🚪 Выйти", callback_data="leave"),
                     InlineKeyboardButton("✅ Готов", callback_data="ready"),
-                ]
+                ],
             ]
         )
         text = 'Вы присоединились к комнате. Нажмите на кнопку "готов", когда будете готовы начать игру.'
@@ -301,13 +298,11 @@ class WaitingStartResponse(BaseResponse):
     async def call(self, _: Context):
         keyboard = InlineKeyboardMarkup(
             [
-                [
-                    InlineKeyboardButton("📝 Правила игры", callback_data="get_rules")
-                ],
+                [InlineKeyboardButton("📝 Правила игры", callback_data="get_rules")],
                 [
                     InlineKeyboardButton("🚪 Выйти", callback_data="leave"),
-                    InlineKeyboardButton("❌ Не готов", callback_data="not_ready")
-                ]
+                    InlineKeyboardButton("❌ Не готов", callback_data="not_ready"),
+                ],
             ]
         )
         return Message(text="Пожалуйста, ожидайте начала игры", reply_markup=keyboard)
@@ -321,13 +316,7 @@ class FallBackResponse(BaseResponse):
 
 class CreateRoomResponse(BaseResponse):
     async def call(self, _: Context):
-        keyboard = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("⬅️ Назад", callback_data="step_backward")
-                ]
-            ]
-        )
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Назад", callback_data="step_backward")]])
         return Message(text="Введите название для комнаты", reply_markup=keyboard)
 
 
@@ -429,8 +418,10 @@ greeting_script = {
         },
         "make": {
             RESPONSE: CreateRoomResponse(),
-            TRANSITIONS: [Tr(dst=("new"), cnd=cnd.Not(CallbackCondition(query_string="step_backward"))),
-                          Tr(dst=dst.Previous(), cnd=CallbackCondition(query_string="step_backward"))],
+            TRANSITIONS: [
+                Tr(dst=("new"), cnd=cnd.Not(CallbackCondition(query_string="step_backward"))),
+                Tr(dst=dst.Previous(), cnd=CallbackCondition(query_string="step_backward")),
+            ],
         },
         "new": {
             RESPONSE: NewRoomResponse(),
@@ -452,13 +443,21 @@ greeting_script = {
                 ),
                 Tr(
                     dst=("join_id"),
-                    cnd=cnd.All(cnd.All(cnd.Not(CallbackCondition(query_string="to_random")),
-                                        cnd.Not(CallbackCondition(query_string="step_backward"))), RoomExistCondition()),
+                    cnd=cnd.All(
+                        cnd.All(
+                            cnd.Not(CallbackCondition(query_string="to_random")),
+                            cnd.Not(CallbackCondition(query_string="step_backward")),
+                        ),
+                        RoomExistCondition(),
+                    ),
                 ),
                 Tr(
                     dst="room_not_found",
-                    cnd=cnd.All(cnd.Not(CallbackCondition(query_string="to_random")),
-                                cnd.Not(CallbackCondition(query_string="step_backward")), cnd.Not(RoomExistCondition())),
+                    cnd=cnd.All(
+                        cnd.Not(CallbackCondition(query_string="to_random")),
+                        cnd.Not(CallbackCondition(query_string="step_backward")),
+                        cnd.Not(RoomExistCondition()),
+                    ),
                 ),
                 Tr(dst="choose", cnd=CallbackCondition(query_string="step_backward")),
             ],
@@ -486,8 +485,10 @@ greeting_script = {
         "not_ready": {
             PRE_RESPONSE: {"join_room": JoinRoomProcessing()},
             RESPONSE: AreYouReadyResponse(),
-            PRE_TRANSITION: {"get_rules": GetRulesProcessing(from_where=("in_room_flow", "not_ready")),
-                             "exit_room": ExitRoomProcessing()},
+            PRE_TRANSITION: {
+                "get_rules": GetRulesProcessing(from_where=("in_room_flow", "not_ready")),
+                "exit_room": ExitRoomProcessing(),
+            },
             TRANSITIONS: [
                 Tr(dst=("waiting"), cnd=CallbackCondition(query_string="ready")),
                 Tr(dst=("to_room_flow", "choose"), cnd=CallbackCondition(query_string="leave")),
@@ -497,8 +498,10 @@ greeting_script = {
         "waiting": {
             PRE_RESPONSE: {"call_syncronizer": CheckReadyProcessing()},
             RESPONSE: WaitingStartResponse(),
-            PRE_TRANSITION: {"get_rules": GetRulesProcessing(from_where=("in_room_flow", "waiting")),
-                             "exit_room": ExitRoomProcessing()},
+            PRE_TRANSITION: {
+                "get_rules": GetRulesProcessing(from_where=("in_room_flow", "waiting")),
+                "exit_room": ExitRoomProcessing(),
+            },
             TRANSITIONS: [
                 Tr(dst=("to_room_flow", "choose"), cnd=CallbackCondition(query_string="leave")),
                 Tr(dst="not_ready", cnd=CallbackCondition(query_string="not_ready")),
