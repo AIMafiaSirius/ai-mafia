@@ -37,12 +37,12 @@ from ai_mafia.db.routines import (
     get_random_room,
     join_room,
     murder,
-    send_player_messange,
+    send_player_message,
     set_player_state,
     shoot,
     start_game,
 )
-from ai_mafia.tg_proxy import chatsky_web_api, chatsky_web_interface, send_message, send_signal
+from ai_mafia.tg_proxy import chatsky_web_api, chatsky_web_interface, send_signal
 
 if TYPE_CHECKING:
     import telegram as tg
@@ -372,8 +372,7 @@ class ShootingResponse(BaseResponse):
         room_info: RoomModel = ctx.misc["room_info"]
         player_info: PlayerModel = room_info.get_player(str(user_info.db_id))
         if ctx.id == room_info.list_players[0].ctx_id:
-            await asyncio.sleep(7)
-            send_signal(find_game_room(room_info.room_id))
+            send_signal(find_game_room(room_info.room_id), timer=10)
         if player_info.role in ("мафия", "дон") and player_info.state == "alive":
             return "Наступает ночь! Напишите номер игрока, в которого будете стрелять. У вас 10 секунд"
         return "Наступает ночь! Мафия выбирает, кого убить"
@@ -404,8 +403,7 @@ class CheckResponse(BaseResponse):
         room_info: RoomModel = ctx.misc["room_info"]
         player_info: PlayerModel = room_info.get_player(str(user_info.db_id))
         if ctx.id == room_info.list_players[0].ctx_id:
-            await asyncio.sleep(7)
-            send_signal(find_game_room(room_info.room_id))
+            send_signal(find_game_room(room_info.room_id), timer=10)
         if player_info.role == "комиссар" and player_info.state == "alive":
             return "Вы - комиссар. Напишите номер игрока, которого хотите проверить. У вас 10 секунд"
         if player_info.role == "дон" and player_info.state == "alive":
@@ -482,6 +480,7 @@ class DeadSpeechProcessing(BaseProcessing):
         player: PlayerModel = room.get_pre_dead_player()
         if ctx.id == player.ctx_id:
             update_last_words(room.room_id, ctx.last_request.text)
+            send_signal(room=room, timer=10)
 
 
 class DeadSpeechResponse(BaseResponse):
@@ -518,10 +517,11 @@ class ReadDeadSpeechResponse(BaseResponse):
 class LastWordsProcessing(BaseProcessing):
     async def call(self, ctx: Context):
         room_info: RoomModel = ctx.misc["room_info"]
+        user_info: UserModel = ctx.misc["user_info"]
         update_last_words(room_info.room_id, ctx.last_request.text)
 
         room = find_game_room(room_info.room_id)
-        send_signal(room=room, msg="_speech_")
+        send_player_message(room=room, user_id=str(user_info.db_id), msg="_speech_")
 
 
 class ReadLastWordsResponse(BaseResponse):
@@ -790,15 +790,15 @@ greeting_script = {
             PRE_TRANSITION: {"speech": DeadSpeechProcessing()},
             TRANSITIONS: [
                 Tr(dst=("day"), cnd=cnd.ExactMatch("_skip_")),
-                Tr(dst=("writing_cycle")),
+                Tr(dst=("writing_cycle"), cnd=cnd.Not(cnd.ExactMatch("_skip_"))),
             ],
         },
         "writing_cycle": {
-            RESPONSE: LastWordsResponse(),
+            RESPONSE: "ваше слово:",
             PRE_TRANSITION: {"save_last_words": LastWordsProcessing()},
             TRANSITIONS: [
-                Tr(dst=("day"), cnd=cnd.ExactMatch("_skip_")),
-                Tr(dst=("writing_cycle"), cnd=cnd.Not(cnd.ExactMatch("_skip_"))),
+                Tr(dst=("day"), cnd=cnd.Any(CallbackCondition(query_string="_skip_"), cnd.ExactMatch("_skip_"))),
+                Tr(dst=("writing_cycle"), cnd=cnd.Not(CallbackCondition(query_string="_skip_"))),
             ]
         },
         "read_dead_speech": {
@@ -812,6 +812,7 @@ greeting_script = {
             RESPONSE: ReadLastWordsResponse(),
             TRANSITIONS: [
                 Tr(dst=("day"), cnd=cnd.ExactMatch("_skip_")),
+                Tr(dst=("reading_cycle"), cnd=cnd.ExactMatch("_speech_")),
             ],
         },
         "day": {

@@ -31,15 +31,15 @@ async def respond(
     return context.last_response
 
 
-async def send_message(ctx_id: str, chat_id: int, msg: str):
-    await asyncio.sleep(2)
+async def send_message(ctx_id: str, chat_id: int, msg: str, time_sleep=5):
+    await asyncio.sleep(time_sleep)
     context = await interface.on_request_async(Message(text=msg), ctx_id)
     await bot.send_message(chat_id=chat_id, text=context.last_response.text)
 
 
-def send_signal(room: RoomModel | None, msg: str = "_skip_"):
+def send_signal(room: RoomModel | None, msg: str = "_skip_", timer=5):
     if room is None:
         msg = "Room not found :("
         raise ValueError(msg)
-    coroutines = [send_message(player.ctx_id, player.chat_id, msg) for player in room.list_players]
+    coroutines = [send_message(player.ctx_id, player.chat_id, msg, timer) for player in room.list_players]
     [asyncio.create_task(coro) for coro in coroutines]

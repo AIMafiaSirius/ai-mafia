@@ -187,11 +187,11 @@ def murder(room_id: str) -> bool:
     return res
 
 
-def send_player_messange(room: RoomModel, user_id: str, msg: str):
+def send_player_message(room: RoomModel, user_id: str, msg: str):
     coroutines = []
     for player in room.list_players:
         if player.user_id != user_id:
-            coroutines.append(send_message(player.ctx_id, player.chat_id, msg))  # noqa: PERF401
+            coroutines.append(send_message(player.ctx_id, player.chat_id, msg, 0))  # noqa: PERF401
     [asyncio.create_task(coro) for coro in coroutines]
 
 
