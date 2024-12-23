@@ -190,3 +190,7 @@ def send_player_messange(room: RoomModel, user_id: str, msg: str):
         if player.user_id != user_id:
             coroutines.append(send_message(player.ctx_id, player.chat_id, msg))  # noqa: PERF401
     [asyncio.create_task(coro) for coro in coroutines]
+
+
+def update_last_words(room_id: str, msg: str):
+    rooms_collection.update_one({"room_id": room_id}, {"$set": {"last_words": msg}})

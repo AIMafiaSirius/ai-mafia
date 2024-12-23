@@ -59,6 +59,8 @@ class RoomModel(BaseModel):
     name: str
     """Name of this game room"""
 
+    last_words: str | None = None
+
     room_state: RoomState = "created"
 
     list_players: list[PlayerModel] = []
