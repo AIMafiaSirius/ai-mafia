@@ -166,6 +166,9 @@ def start_game(room_db_id: ObjectId):
         lst_players[i]["state"] = "alive"
         lst_players[i]["role"] = lst_role[i]
         lst_players[i]["number"] = i + 1
+
+    lst_players[0]["role"] = "дон"
+    lst_players[1]["role"] = "комиссар"
     rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": lst_players, "room_state": "started"}})
 
 

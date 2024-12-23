@@ -42,7 +42,7 @@ from ai_mafia.db.routines import (
     shoot,
     start_game,
 )
-from ai_mafia.tg_proxy import chatsky_web_api, chatsky_web_interface, send_signal
+from ai_mafia.tg_proxy import chatsky_web_api, chatsky_web_interface, send_message, send_signal
 
 if TYPE_CHECKING:
     import telegram as tg
@@ -472,8 +472,7 @@ class EndNightResponse(BaseResponse):
         pre_dead_player: PlayerModel = room.get_pre_dead_player()
         if pre_dead_player is None:
             return "В эту ночь мафия никого не убила"
-        return f"""В эту ночь мафия убила игрока номер {pre_dead_player.number}
-У игрока {pre_dead_player.number} есть 1 минута на прощальную речь"""
+        return f"""В эту ночь мафия убила игрока номер {pre_dead_player.number}"""
 
 
 class DeadSpeechProcessing(BaseProcessing):
@@ -483,6 +482,77 @@ class DeadSpeechProcessing(BaseProcessing):
         player: PlayerModel = room.get_pre_dead_player()
         if ctx.id == player.ctx_id:
             update_last_words(room.room_id, ctx.last_request.text)
+
+
+class DeadSpeechResponse(BaseResponse):
+    async def call(self, ctx: Context):
+        room_info: RoomModel = ctx.misc["room_info"]
+        room = find_game_room(room_info.room_id)
+        player: PlayerModel = room.get_pre_dead_player()
+
+        if ctx.id == player.ctx_id:
+            return "Ваше слово:"
+        if room.last_words is None:
+            return f"Сейчас будет речь игрока {player.number}"
+        return room.last_words
+
+
+class AreYouPreDeadCondition(BaseCondition):
+    async def call(self, ctx: Context):
+        room_info: RoomModel = ctx.misc["room_info"]
+        room = find_game_room(room_info.room_id)
+        player: PlayerModel = room.get_pre_dead_player()
+
+        return ctx.id == player.ctx_id
+
+
+class ReadDeadSpeechResponse(BaseResponse):
+    async def call(self, ctx: Context):
+        room_info: RoomModel = ctx.misc["room_info"]
+        room = find_game_room(room_info.room_id)
+        player: PlayerModel = room.get_pre_dead_player()
+
+        return f"У игрока {player.number} есть прощальная минута."
+
+
+class LastWordsProcessing(BaseProcessing):
+    async def call(self, ctx: Context):
+        room_info: RoomModel = ctx.misc["room_info"]
+        update_last_words(room_info.room_id, ctx.last_request.text)
+
+        room = find_game_room(room_info.room_id)
+        send_signal(room=room, msg="_speech_")
+
+
+class ReadLastWordsResponse(BaseResponse):
+    async def call(self, ctx: Context):
+        room_info: RoomModel = ctx.misc["room_info"]
+        room = find_game_room(room_info.room_id)
+        return room.last_words
+
+
+class LastWordsResponse(BaseResponse):
+    async def call(self, _: Context):
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("❌ Закончить речь", "_skip_")
+                ]
+            ]
+        )
+        return Message(text="Ваше слово:", reply_markup=keyboard)
+
+
+class LastMinuteResponse(BaseResponse):
+    async def call(self, _: Context):
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("✅ ОК", "ok")
+                ]
+            ]
+        )
+        return Message(text="У вас есть прощальная минута", reply_markup=keyboard)
 
 
 greeting_script = {
@@ -701,6 +771,7 @@ greeting_script = {
             TRANSITIONS: [Tr(dst=("post_check_phase"), cnd=cnd.Not(cnd.ExactMatch("_skip_"))),
                         Tr(dst=("end_of_night"), cnd=cnd.ExactMatch("_skip_"))],
         },
+
         "post_check_phase": {
             RESPONSE: "Пожалуйста, дождитесь окончание таймера",
             TRANSITIONS: [Tr(dst=("end_of_night"), cnd=cnd.ExactMatch("_skip_"))],
@@ -710,19 +781,41 @@ greeting_script = {
             RESPONSE: EndNightResponse(),
             TRANSITIONS: [
                 Tr(dst=("day"), cnd=cnd.ExactMatch("_skip_")),
-                Tr(dst=("dead_speech"), cnd=cnd.ExactMatch("_kill_")),
+                Tr(dst=("read_dead_speech"), cnd=cnd.All(cnd.ExactMatch("_kill_"), cnd.Not(AreYouPreDeadCondition()))),
+                Tr(dst=("write_dead_speech"), cnd=cnd.All(cnd.ExactMatch("_kill_"), AreYouPreDeadCondition())),
             ],
         },
-        "dead_speech": {
-            RESPONSE: "Отправлено",
+        "write_dead_speech": {
+            RESPONSE: LastMinuteResponse(),
             PRE_TRANSITION: {"speech": DeadSpeechProcessing()},
             TRANSITIONS: [
                 Tr(dst=("day"), cnd=cnd.ExactMatch("_skip_")),
-                Tr(dst=("dead_speech"), cnd=cnd.Not(cnd.ExactMatch("_skip_"))),
+                Tr(dst=("writing_cycle")),
+            ],
+        },
+        "writing_cycle": {
+            RESPONSE: LastWordsResponse(),
+            PRE_TRANSITION: {"save_last_words": LastWordsProcessing()},
+            TRANSITIONS: [
+                Tr(dst=("day"), cnd=cnd.ExactMatch("_skip_")),
+                Tr(dst=("writing_cycle"), cnd=cnd.Not(cnd.ExactMatch("_skip_"))),
+            ]
+        },
+        "read_dead_speech": {
+            RESPONSE: ReadDeadSpeechResponse(),
+            TRANSITIONS: [
+                Tr(dst=("day"), cnd=cnd.ExactMatch("_skip_")),
+                Tr(dst=("reading_cycle"), cnd=cnd.ExactMatch("_speech_")),
+            ],
+        },
+        "reading_cycle": {
+            RESPONSE: ReadLastWordsResponse(),
+            TRANSITIONS: [
+                Tr(dst=("day"), cnd=cnd.ExactMatch("_skip_")),
             ],
         },
         "day": {
-            RESPONSE: "_",
+            RESPONSE: "Наступил день",
         },
     },
 }
