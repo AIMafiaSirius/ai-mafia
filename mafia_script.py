@@ -32,6 +32,7 @@ from ai_mafia.db.routines import (
     add_user,
     exit_room,
     find_game_room,
+    update_last_words,
     find_user,
     get_random_room,
     join_room,
@@ -449,7 +450,7 @@ class DonsCheckResponse(BaseResponse):
             role = ctx.misc["room_info"].list_players[num - 1].role
             is_com = "не комиссар"
             if role == "комиссар":
-                role = "комиссар"
+                is_com = "комиссар"
             return f"Этот игрок {is_com}"
         return "Напишите номер игрока, которого хотите проверить"
 
@@ -481,7 +482,7 @@ class DeadSpeechProcessing(BaseProcessing):
         room = find_game_room(room_info.room_id)
         player: PlayerModel = room.get_pre_dead_player()
         if ctx.id == player.ctx_id:
-            send_player_messange(room=room, user_id=player.user_id, msg=ctx.last_request.text)
+            update_last_words(room.room_id, ctx.last_request.text)
 
 
 greeting_script = {
@@ -692,11 +693,13 @@ greeting_script = {
         },
         "coms_check": {
             RESPONSE: ComsCheckResponse(),
-            TRANSITIONS: [Tr(dst=("post_check_phase")), Tr(dst=("end_of_night"), cnd=cnd.ExactMatch("_skip_"))],
+            TRANSITIONS: [Tr(dst=("post_check_phase"), cnd=cnd.Not(cnd.ExactMatch("_skip_"))),
+                        Tr(dst=("end_of_night"), cnd=cnd.ExactMatch("_skip_"))],
         },
         "dons_check": {
             RESPONSE: DonsCheckResponse(),
-            TRANSITIONS: [Tr(dst=("post_check_phase"), cnd=cnd.ExactMatch("_skip_"))],
+            TRANSITIONS: [Tr(dst=("post_check_phase"), cnd=cnd.Not(cnd.ExactMatch("_skip_"))),
+                        Tr(dst=("end_of_night"), cnd=cnd.ExactMatch("_skip_"))],
         },
         "post_check_phase": {
             RESPONSE: "Пожалуйста, дождитесь окончание таймера",
@@ -711,7 +714,7 @@ greeting_script = {
             ],
         },
         "dead_speech": {
-            RESPONSE: "",
+            RESPONSE: "Отправлено",
             PRE_TRANSITION: {"speech": DeadSpeechProcessing()},
             TRANSITIONS: [
                 Tr(dst=("day"), cnd=cnd.ExactMatch("_skip_")),
@@ -719,7 +722,7 @@ greeting_script = {
             ],
         },
         "day": {
-            RESPONSE: "",
+            RESPONSE: "_",
         },
     },
 }
