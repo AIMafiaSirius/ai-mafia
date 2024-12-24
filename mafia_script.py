@@ -1,4 +1,3 @@
-import asyncio
 import json
 from typing import TYPE_CHECKING
 
@@ -32,7 +31,6 @@ from ai_mafia.db.routines import (
     add_user,
     exit_room,
     find_game_room,
-    update_last_words,
     find_user,
     get_random_room,
     join_room,
@@ -41,6 +39,7 @@ from ai_mafia.db.routines import (
     set_player_state,
     shoot,
     start_game,
+    update_last_words,
 )
 from ai_mafia.tg_proxy import chatsky_web_api, chatsky_web_interface, send_signal
 
@@ -533,25 +532,13 @@ class ReadLastWordsResponse(BaseResponse):
 
 class LastWordsResponse(BaseResponse):
     async def call(self, _: Context):
-        keyboard = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("❌ Закончить речь", "_skip_")
-                ]
-            ]
-        )
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Закончить речь", "_skip_")]])
         return Message(text="Ваше слово:", reply_markup=keyboard)
 
 
 class LastMinuteResponse(BaseResponse):
     async def call(self, _: Context):
-        keyboard = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("✅ ОК", "ok")
-                ]
-            ]
-        )
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("✅ ОК", "ok")]])
         return Message(text="У вас есть прощальная минута", reply_markup=keyboard)
 
 
@@ -763,15 +750,18 @@ greeting_script = {
         },
         "coms_check": {
             RESPONSE: ComsCheckResponse(),
-            TRANSITIONS: [Tr(dst=("post_check_phase"), cnd=cnd.Not(cnd.ExactMatch("_skip_"))),
-                        Tr(dst=("end_of_night"), cnd=cnd.ExactMatch("_skip_"))],
+            TRANSITIONS: [
+                Tr(dst=("post_check_phase"), cnd=cnd.Not(cnd.ExactMatch("_skip_"))),
+                Tr(dst=("end_of_night"), cnd=cnd.ExactMatch("_skip_")),
+            ],
         },
         "dons_check": {
             RESPONSE: DonsCheckResponse(),
-            TRANSITIONS: [Tr(dst=("post_check_phase"), cnd=cnd.Not(cnd.ExactMatch("_skip_"))),
-                        Tr(dst=("end_of_night"), cnd=cnd.ExactMatch("_skip_"))],
+            TRANSITIONS: [
+                Tr(dst=("post_check_phase"), cnd=cnd.Not(cnd.ExactMatch("_skip_"))),
+                Tr(dst=("end_of_night"), cnd=cnd.ExactMatch("_skip_")),
+            ],
         },
-
         "post_check_phase": {
             RESPONSE: "Пожалуйста, дождитесь окончание таймера",
             TRANSITIONS: [Tr(dst=("end_of_night"), cnd=cnd.ExactMatch("_skip_"))],
@@ -799,7 +789,7 @@ greeting_script = {
             TRANSITIONS: [
                 Tr(dst=("day"), cnd=cnd.Any(CallbackCondition(query_string="_skip_"), cnd.ExactMatch("_skip_"))),
                 Tr(dst=("writing_cycle"), cnd=cnd.Not(CallbackCondition(query_string="_skip_"))),
-            ]
+            ],
         },
         "read_dead_speech": {
             RESPONSE: ReadDeadSpeechResponse(),
