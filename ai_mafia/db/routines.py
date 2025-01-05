@@ -7,6 +7,7 @@ from bson.objectid import ObjectId
 from pymongo import MongoClient
 
 from ai_mafia.tg_proxy.chatsky_web_api import send_message
+from ai_mafia.types import PlayerState, RoomState
 
 from .models import PlayerModel, RoomModel, UserModel
 from .setup import load_config
@@ -74,7 +75,7 @@ def find_game_room(room_id: str) -> RoomModel | None:
 def add_room(name_room: str) -> RoomModel:
     """Add new game room and store info in database, return created room"""
     room = RoomModel(name=name_room, room_id=str(uuid4().hex))
-    result = rooms_collection.insert_one(room.model_dump())
+    result = rooms_collection.insert_one(room.model_dump(mode="json"))
     room.db_id = result.inserted_id
     return room
 
@@ -84,14 +85,14 @@ def get_random_room() -> RoomModel | None:
     If any game room open, randomly return one of them.
     Otherwise, return None.
     """
-    list_room = list(rooms_collection.find({"room_state": "created"}))
+    list_room = list(rooms_collection.find({"room_state": RoomState.CREATED.value}))
     if len(list_room) == 0:
         return None
     room = random.choice(list_room)
     return RoomModel(**room)
 
 
-def set_player_state(user_db_id: ObjectId, room_db_id: ObjectId, state: str) -> RoomModel:
+def set_player_state(user_db_id: ObjectId, room_db_id: ObjectId, state: PlayerState) -> RoomModel:
     """Mark user as ready and return updated room model"""
     room = rooms_collection.find_one({"_id": room_db_id})
     if room is None:
@@ -99,7 +100,7 @@ def set_player_state(user_db_id: ObjectId, room_db_id: ObjectId, state: str) -> 
         raise RuntimeError(msg)
     room_model = RoomModel(**room)
     room_model.change_player_state(user_db_id=str(user_db_id), state=state)
-    list_players_dict = [player.model_dump() for player in room_model.list_players]
+    list_players_dict = [player.model_dump(mode="json") for player in room_model.list_players]
     rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": list_players_dict}})
     return room_model
 
@@ -128,7 +129,7 @@ def join_room(user_db_id: ObjectId, room_db_id: ObjectId, ctx_id: str, chat_id: 
         msg = "Something's wrong. Room not found"
         raise RuntimeError(msg)
     lst_players: list = room["list_players"]
-    lst_players.append(PlayerModel(user_id=str(user_db_id), ctx_id=ctx_id, chat_id=chat_id).model_dump())
+    lst_players.append(PlayerModel(user_id=str(user_db_id), ctx_id=ctx_id, chat_id=chat_id).model_dump(mode="json"))
     rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": lst_players}})
 
 
@@ -169,7 +170,9 @@ def start_game(room_db_id: ObjectId):
 
     lst_players[0]["role"] = "дон"
     lst_players[1]["role"] = "комиссар"
-    rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": lst_players, "room_state": "started"}})
+    rooms_collection.update_one(
+        {"_id": room_db_id}, {"$set": {"list_players": lst_players, "room_state": RoomState.STARTED.value}}
+    )
 
 
 def shoot(room_db_id: ObjectId, i: int):

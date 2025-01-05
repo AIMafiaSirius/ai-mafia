@@ -1,7 +1,7 @@
-from typing import Literal
-
 from bson.objectid import ObjectId
 from pydantic import BaseModel, ConfigDict, Field
+
+from ai_mafia.types import PlayerState, RoomState
 
 
 class UserModel(BaseModel):
@@ -24,15 +24,12 @@ class UserModel(BaseModel):
     """Total number of played games from this user from all his sessions."""
 
 
-PlayerState = Literal["not_ready", "ready", "alive", "pre_dead", "dead"]
-
-
 class PlayerModel(BaseModel):
     user_id: str | None
 
     role: str | None = None
 
-    state: PlayerState = "not_ready"
+    state: PlayerState = PlayerState.NOT_READY
 
     number: int | None = None
 
@@ -41,9 +38,6 @@ class PlayerModel(BaseModel):
     chat_id: int
 
     shoot_cnt: int = 0
-
-
-RoomState = Literal["created", "started", "ended"]
 
 
 class RoomModel(BaseModel):
@@ -61,7 +55,7 @@ class RoomModel(BaseModel):
 
     last_words: str | None = None
 
-    room_state: RoomState = "created"
+    room_state: RoomState = RoomState.CREATED
 
     list_players: list[PlayerModel] = []
     """List of user's tg id in the game room"""
@@ -79,7 +73,7 @@ class RoomModel(BaseModel):
         """
         Check whether there are 10 ready players in the room
         """
-        ready_count = sum(player.state == "ready" for player in self.list_players)
+        ready_count = sum(player.state == PlayerState.READY for player in self.list_players)
         return ready_count == n_players_to_wait
 
     def get_player(self, user_db_id: str) -> PlayerModel | None:
@@ -91,7 +85,7 @@ class RoomModel(BaseModel):
     def get_cnt_black(self):
         cnt = 0
         for player in self.list_players:
-            if player.state == "alive" and player.role in ("мафия", "дон"):
+            if player.state == PlayerState.ALIVE and player.role in ("мафия", "дон"):
                 cnt += 1
         return cnt
 
@@ -100,13 +94,13 @@ class RoomModel(BaseModel):
         flag = False
         for player in self.list_players:
             if player.shoot_cnt == shoot_cnt:
-                player.state = "pre_dead"
+                player.state = PlayerState.PRE_DEAD
                 flag = True
             player.shoot_cnt = 0
         return flag
 
     def get_pre_dead_player(self) -> PlayerModel | None:
         for player in self.list_players:
-            if player.state == "pre_dead":
+            if player.state == PlayerState.PRE_DEAD:
                 return player
         return None

@@ -42,6 +42,7 @@ from ai_mafia.db.routines import (
     update_last_words,
 )
 from ai_mafia.tg_proxy import chatsky_web_api, chatsky_web_interface, send_signal
+from ai_mafia.types import PlayerState, RoomState
 
 if TYPE_CHECKING:
     import telegram as tg
@@ -269,7 +270,7 @@ class WaitingStartResponse(BaseResponse):
 class RandomRoomCreatedCondition(BaseCondition):
     async def call(self, ctx: Context) -> MessageInitTypes:
         room = get_random_room()
-        if room is not None and room.room_state == "created":
+        if room is not None and room.room_state == RoomState.CREATED:
             ctx.misc["room_info"] = room
             return True
         return False
@@ -278,7 +279,7 @@ class RandomRoomCreatedCondition(BaseCondition):
 class RoomCreatedCondition(BaseCondition):
     async def call(self, ctx: Context) -> MessageInitTypes:
         room = find_game_room(ctx.last_request.text)
-        if room is not None and room.room_state == "created":
+        if room is not None and room.room_state == RoomState.CREATED:
             ctx.misc["room_info"] = room
             return True
         return False
@@ -322,7 +323,7 @@ class NotReadyProcessing(BaseProcessing):
         if upd is not None and upd.callback_query.data == "not_ready":
             user_info: UserModel = ctx.misc["user_info"]
             room_info: RoomModel = ctx.misc["room_info"]
-            set_player_state(user_info.db_id, room_info.db_id, "not_ready")
+            set_player_state(user_info.db_id, room_info.db_id, PlayerState.NOT_READY)
             ctx.misc["room_info"] = find_game_room(room_info.room_id)
 
 
@@ -330,7 +331,7 @@ class CheckReadyProcessing(ModifyResponse):
     async def modified_response(self, original_response: BaseResponse, ctx: Context):
         user_info: UserModel = ctx.misc["user_info"]
         room_info: RoomModel = ctx.misc["room_info"]
-        room = set_player_state(user_info.db_id, room_info.db_id, "ready")
+        room = set_player_state(user_info.db_id, room_info.db_id, PlayerState.READY)
         if room.is_room_ready(N_PLAYERS):
             send_signal(find_game_room(room_info.room_id), "_ready_")
             return "Мы вас ждали!"
@@ -372,7 +373,7 @@ class ShootingResponse(BaseResponse):
         player_info: PlayerModel = room_info.get_player(str(user_info.db_id))
         if ctx.id == room_info.list_players[0].ctx_id:
             send_signal(find_game_room(room_info.room_id), timer=10)
-        if player_info.role in ("мафия", "дон") and player_info.state == "alive":
+        if player_info.role in ("мафия", "дон") and player_info.state == PlayerState.ALIVE:
             return "Наступает ночь! Напишите номер игрока, в которого будете стрелять. У вас 10 секунд"
         return "Наступает ночь! Мафия выбирает, кого убить"
 
@@ -403,9 +404,9 @@ class CheckResponse(BaseResponse):
         player_info: PlayerModel = room_info.get_player(str(user_info.db_id))
         if ctx.id == room_info.list_players[0].ctx_id:
             send_signal(find_game_room(room_info.room_id), timer=10)
-        if player_info.role == "комиссар" and player_info.state == "alive":
+        if player_info.role == "комиссар" and player_info.state == PlayerState.ALIVE:
             return "Вы - комиссар. Напишите номер игрока, которого хотите проверить. У вас 10 секунд"
-        if player_info.role == "дон" and player_info.state == "alive":
+        if player_info.role == "дон" and player_info.state == PlayerState.ALIVE:
             return "Вы - дон мафии. Напишите номер игрока, которого хотите проверить на комиссарство. У вас 10 секунд"
         return "Дон и комиссар делают проверки"
 
