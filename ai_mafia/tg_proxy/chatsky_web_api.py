@@ -43,3 +43,12 @@ def send_signal(room: RoomModel | None, msg: str = "_skip_", timer=5):
         raise ValueError(msg)
     coroutines = [send_message(player.ctx_id, player.chat_id, msg, timer) for player in room.list_players]
     [asyncio.create_task(coro) for coro in coroutines]
+
+
+def send_message_to_others(room: RoomModel, user_id: str, msg: str):
+    """Send message from specific user to other players in room"""
+    coroutines = []
+    for player in room.list_players:
+        if player.user_id != user_id:
+            coroutines.append(send_message(player.ctx_id, player.chat_id, msg, 0))  # noqa: PERF401
+    [asyncio.create_task(coro) for coro in coroutines]

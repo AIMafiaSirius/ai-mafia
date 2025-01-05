@@ -1,11 +1,9 @@
-import asyncio
 import random
 from uuid import uuid4
 
 from bson.objectid import ObjectId
 from pymongo import MongoClient
 
-from ai_mafia.tg_proxy.chatsky_web_api import send_message
 from ai_mafia.types import PlayerRole, PlayerState, RoomState
 
 from .models import PlayerModel, RoomModel, UserModel
@@ -186,14 +184,6 @@ def murder(room_id: str) -> bool:
     list_players_dict = [player.model_dump(mode="json") for player in room.list_players]
     rooms_collection.update_one({"room_id": room_id}, {"$set": {"list_players": list_players_dict}})
     return res
-
-
-def send_player_message(room: RoomModel, user_id: str, msg: str):
-    coroutines = []
-    for player in room.list_players:
-        if player.user_id != user_id:
-            coroutines.append(send_message(player.ctx_id, player.chat_id, msg, 0))  # noqa: PERF401
-    [asyncio.create_task(coro) for coro in coroutines]
 
 
 def update_last_words(room_id: str, msg: str):

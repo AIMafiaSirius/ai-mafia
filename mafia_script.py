@@ -35,13 +35,12 @@ from ai_mafia.db.routines import (
     get_random_room,
     join_room,
     murder,
-    send_player_message,
     set_player_state,
     shoot,
     start_game,
     update_last_words,
 )
-from ai_mafia.tg_proxy import chatsky_web_api, chatsky_web_interface, send_signal
+from ai_mafia.tg_proxy import chatsky_web_api, chatsky_web_interface, send_message_to_others, send_signal
 from ai_mafia.types import PlayerRole, PlayerState, RoomState
 
 if TYPE_CHECKING:
@@ -517,7 +516,7 @@ class LastWordsProcessing(BaseProcessing):
         update_last_words(room_info.room_id, ctx.last_request.text)
 
         room = find_game_room(room_info.room_id)
-        send_player_message(room=room, user_id=str(user_info.db_id), msg="_speech_")
+        send_message_to_others(room=room, user_id=str(user_info.db_id), msg="_speech_")
 
 
 class ReadLastWordsResponse(BaseResponse):
