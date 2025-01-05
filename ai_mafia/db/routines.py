@@ -167,11 +167,17 @@ def start_game(room_db_id: ObjectId):
     )
 
 
-def shoot(room_db_id: ObjectId, i: int):
-    room = rooms_collection.find_one({"_id": room_db_id})
-    lst_players: list = room["list_players"]
-    lst_players[i]["shoot_cnt"] += 1
-    rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": lst_players}})
+def shoot(room_db_id: ObjectId, player_number: int):
+    room = RoomModel(**rooms_collection.find_one({"_id": room_db_id}))
+
+    for player in room.list_players:
+        if player.number == player_number:
+            player.shoot_cnt += 1
+            break
+
+    dumped_players_list = room.model_dump(mode="json")["list_players"]
+
+    rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": dumped_players_list}})
 
 
 def murder(room_id: str) -> bool:
