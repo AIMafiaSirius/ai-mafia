@@ -42,7 +42,7 @@ from ai_mafia.db.routines import (
     update_last_words,
 )
 from ai_mafia.tg_proxy import chatsky_web_api, chatsky_web_interface, send_signal
-from ai_mafia.types import PlayerState, RoomState
+from ai_mafia.types import PlayerRole, PlayerState, RoomState
 
 if TYPE_CHECKING:
     import telegram as tg
@@ -359,7 +359,7 @@ class StartGameResponse(BaseResponse):
         player_info: PlayerModel = room.get_player(str(user_info.db_id))
         return f"""Игра началась!
 Ваш номер: {player_info.number}
-Ваша роль: {player_info.role}"""
+Ваша роль: {player_info.role.value}"""
 
 
 with open("game_rules.json", encoding="utf8") as file:  # noqa: PTH123
@@ -373,7 +373,7 @@ class ShootingResponse(BaseResponse):
         player_info: PlayerModel = room_info.get_player(str(user_info.db_id))
         if ctx.id == room_info.list_players[0].ctx_id:
             send_signal(find_game_room(room_info.room_id), timer=10)
-        if player_info.role in ("мафия", "дон") and player_info.state == PlayerState.ALIVE:
+        if player_info.role.is_black() and player_info.state == PlayerState.ALIVE:
             return "Наступает ночь! Напишите номер игрока, в которого будете стрелять. У вас 10 секунд"
         return "Наступает ночь! Мафия выбирает, кого убить"
 
@@ -386,7 +386,7 @@ class ShootingProcessing(BaseProcessing):
         room_info: RoomModel = ctx.misc["room_info"]
         player_info: PlayerModel = room_info.get_player(str(user_info.db_id))
         request = ctx.last_request.text
-        if player_info.role in ("мафия", "дон") and request in NUM_PLAYERS:
+        if player_info.role.is_black() and request in NUM_PLAYERS:
             shoot(room_db_id=ctx.misc["room_info"].db_id, i=int(request) - 1)
 
 
@@ -394,7 +394,7 @@ class ShootCondition(BaseCondition):
     async def call(self, ctx: Context) -> MessageInitTypes:
         user_info: UserModel = ctx.misc["user_info"]
         room_info: RoomModel = ctx.misc["room_info"]
-        return room_info.get_player(str(user_info.db_id)).role in ("мафия", "дон")
+        return room_info.get_player(str(user_info.db_id)).role.is_black()
 
 
 class CheckResponse(BaseResponse):
@@ -404,9 +404,9 @@ class CheckResponse(BaseResponse):
         player_info: PlayerModel = room_info.get_player(str(user_info.db_id))
         if ctx.id == room_info.list_players[0].ctx_id:
             send_signal(find_game_room(room_info.room_id), timer=10)
-        if player_info.role == "комиссар" and player_info.state == PlayerState.ALIVE:
+        if player_info.role == PlayerRole.COMMISSAR and player_info.state == PlayerState.ALIVE:
             return "Вы - комиссар. Напишите номер игрока, которого хотите проверить. У вас 10 секунд"
-        if player_info.role == "дон" and player_info.state == PlayerState.ALIVE:
+        if player_info.role == PlayerRole.DON and player_info.state == PlayerState.ALIVE:
             return "Вы - дон мафии. Напишите номер игрока, которого хотите проверить на комиссарство. У вас 10 секунд"
         return "Дон и комиссар делают проверки"
 
@@ -416,7 +416,7 @@ class IsCom(BaseCondition):
         user_info: UserModel = ctx.misc["user_info"]
         room_info: RoomModel = ctx.misc["room_info"]
         player_info: PlayerModel = room_info.get_player(str(user_info.db_id))
-        return player_info.role == "комиссар"
+        return player_info.role == PlayerRole.COMMISSAR
 
 
 class IsDon(BaseCondition):
@@ -424,7 +424,7 @@ class IsDon(BaseCondition):
         user_info: UserModel = ctx.misc["user_info"]
         room_info: RoomModel = ctx.misc["room_info"]
         player_info: PlayerModel = room_info.get_player(str(user_info.db_id))
-        return player_info.role == "дон"
+        return player_info.role == PlayerRole.DON
 
 
 class ComsCheckResponse(BaseResponse):
@@ -432,10 +432,8 @@ class ComsCheckResponse(BaseResponse):
         request = ctx.last_request.text
         if request in NUM_PLAYERS:
             num = int(request)
-            role = ctx.misc["room_info"].list_players[num - 1].role
-            color = "красный"
-            if role in ("мафия", "дон"):
-                color = "чёрный"
+            role: PlayerRole = ctx.misc["room_info"].list_players[num - 1].role
+            color = "чёрный" if role.is_black() else "красный"
             return f"Этот игрок {color}"
         return "Напишите номер игрока, которого хотите проверить"
 
@@ -446,10 +444,8 @@ class DonsCheckResponse(BaseResponse):
         if request in NUM_PLAYERS:
             num = int(request)
             role = ctx.misc["room_info"].list_players[num - 1].role
-            is_com = "не комиссар"
-            if role == "комиссар":
-                is_com = "комиссар"
-            return f"Этот игрок {is_com}"
+            is_com = "" if role == PlayerRole.COMMISSAR else "не "
+            return f"Этот игрок {is_com}комиссар"
         return "Напишите номер игрока, которого хотите проверить"
 
 

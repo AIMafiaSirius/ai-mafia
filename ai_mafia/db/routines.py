@@ -1,13 +1,12 @@
 import asyncio
 import random
-from random import randint
 from uuid import uuid4
 
 from bson.objectid import ObjectId
 from pymongo import MongoClient
 
 from ai_mafia.tg_proxy.chatsky_web_api import send_message
-from ai_mafia.types import PlayerState, RoomState
+from ai_mafia.types import PlayerRole, PlayerState, RoomState
 
 from .models import PlayerModel, RoomModel, UserModel
 from .setup import load_config
@@ -150,28 +149,21 @@ def exit_room(user_db_id: ObjectId, room_db_id: ObjectId):
     rooms_collection.update_one({"_id": room_db_id}, {"$set": {"list_players": lst_players}})
 
 
-def shuffle_list(arr: list) -> list:
-    for i in range(len(arr)):
-        j = randint(0, i)
-        arr[i], arr[j] = arr[j], arr[i]
-    return arr
-
-
 def start_game(room_db_id: ObjectId):
-    room = rooms_collection.find_one({"_id": room_db_id})
-    lst_players: list = room["list_players"]
-    lst_players = shuffle_list(lst_players)
-    lst_role = ["комиссар", "мафия", "мафия", "дон", "мирный", "мирный", "мирный", "мирный", "мирный", "мирный"]
-    lst_role = shuffle_list(lst_role)
-    for i in range(len(lst_players)):
-        lst_players[i]["state"] = "alive"
-        lst_players[i]["role"] = lst_role[i]
-        lst_players[i]["number"] = i + 1
+    room = RoomModel(**rooms_collection.find_one({"_id": room_db_id}))
 
-    lst_players[0]["role"] = "дон"
-    lst_players[1]["role"] = "комиссар"
+    roles = PlayerRole.all_roles()
+    random.shuffle(roles)
+
+    for i, player in enumerate(room.list_players):
+        player.state = PlayerState.ALIVE
+        player.role = roles[i]
+        player.number = i + 1
+
+    dumped_players_list = room.model_dump(mode="json")["list_players"]
+
     rooms_collection.update_one(
-        {"_id": room_db_id}, {"$set": {"list_players": lst_players, "room_state": RoomState.STARTED.value}}
+        {"_id": room_db_id}, {"$set": {"list_players": dumped_players_list, "room_state": RoomState.STARTED.value}}
     )
 
 
@@ -185,7 +177,7 @@ def shoot(room_db_id: ObjectId, i: int):
 def murder(room_id: str) -> bool:
     room = find_game_room(room_id)
     res = room.kill()
-    list_players_dict = [player.model_dump() for player in room.list_players]
+    list_players_dict = [player.model_dump(mode="json") for player in room.list_players]
     rooms_collection.update_one({"room_id": room_id}, {"$set": {"list_players": list_players_dict}})
     return res
 

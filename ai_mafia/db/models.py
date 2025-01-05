@@ -1,7 +1,7 @@
 from bson.objectid import ObjectId
 from pydantic import BaseModel, ConfigDict, Field
 
-from ai_mafia.types import PlayerState, RoomState
+from ai_mafia.types import PlayerRole, PlayerState, RoomState
 
 
 class UserModel(BaseModel):
@@ -27,7 +27,7 @@ class UserModel(BaseModel):
 class PlayerModel(BaseModel):
     user_id: str | None
 
-    role: str | None = None
+    role: PlayerRole | None = None
 
     state: PlayerState = PlayerState.NOT_READY
 
@@ -85,7 +85,7 @@ class RoomModel(BaseModel):
     def get_cnt_black(self):
         cnt = 0
         for player in self.list_players:
-            if player.state == PlayerState.ALIVE and player.role in ("мафия", "дон"):
+            if player.state == PlayerState.ALIVE and player.role.is_black():
                 cnt += 1
         return cnt
 
